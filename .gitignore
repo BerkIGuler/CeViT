@@ -1,4 +1,7 @@
 .idea/
 data/
+test_data/
+val_data/
+train_data/
 .git/
 __pycache__/
