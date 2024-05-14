@@ -2,6 +2,11 @@ from torch.nn import Module, TransformerEncoderLayer, Linear
 
 
 class Encoder(Module):
+    """
+    1) Linearly projects patch embeddings to transformer dimension.
+    2) Passes through transformer encoder
+    3) Linearly projects transformers output to final dimension
+    """
     def __init__(self,
                  input_dim,
                  output_dim,

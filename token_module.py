@@ -14,9 +14,8 @@ class LinearEncoder(nn.Module):
 
 
 class TokenModule(nn.Module):
-    """Token module
-
-    Obtain embeddings for SNR, Delay Spread, and Doppler Shift
+    """Linearly projects snr, delay spread, and max. doppler shift
+    to obtain token embeddings then concatenates those
     """
     def __init__(self, input_size, embedding_dim):
         super(TokenModule, self).__init__()

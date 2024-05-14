@@ -26,12 +26,12 @@ def extract_values(file_name):
 
 
 def concat_complex_channel(channel_matrix):
-    """concatenation channel matrix along OFDM symbols
+    """makes channel_matrix real by doubling size
         :param
             channel_matrix (torch.Tensor): Complex channel matrix of size
             (num_channels, num_subcarriers, num_ofdm_symbols)
         :return
-            channel_matrix (torch.Tensor): (Real + Imag) channel matrix of size
+            channel_matrix (torch.Tensor): Real channel matrix of size
             (num_channels, num_subcarriers, 2 x num_ofdm_symbols)
     """
 
@@ -42,7 +42,7 @@ def concat_complex_channel(channel_matrix):
 
 
 def inverse_concat_complex_channel(channel_matrix):
-    """reverses concatenation channel matrix along OFDM symbols"""
+    """reverses channel matrix concatenation along OFDM symbols"""
     real_to_imag_idx = int(channel_matrix.shape[-1] / 2)
     real_channel_m = channel_matrix[:, :, :real_to_imag_idx]
     imag_channel_m = channel_matrix[:, :, real_to_imag_idx:]
@@ -51,7 +51,7 @@ def inverse_concat_complex_channel(channel_matrix):
 
 
 class PatchEmbedding(nn.Module):
-    """Patch embedding module"""
+    """Reorganizes channel matrix using the same idea from ViT"""
     def __init__(self, patch_size=(10, 4)):
         super().__init__()
         self.p = patch_size
@@ -64,7 +64,7 @@ class PatchEmbedding(nn.Module):
 
 
 class InversePatchEmbedding(nn.Module):
-    """Patch embedding module"""
+    """Recovers matrix from path embeddings"""
     def __init__(self, output_size=(120, 28), patch_size=(10, 4)):
         super().__init__()
         self.fold = torch.nn.Fold(
