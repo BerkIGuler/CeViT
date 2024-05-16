@@ -16,8 +16,8 @@ log_dir = "runs"
 writer = SummaryWriter(os.path.join(log_dir, args.exp_name))
 
 test_set_size_per_point = 2000
-batch_size = 32
-epoch = 10
+batch_size = args.batch_size
+epoch = args.epoch
 model_dim = 128  # transformer linear projection dim
 n_head = 4
 patch_dim = 40  # patch embedding dim
@@ -164,9 +164,3 @@ writer.add_figure(tag='MSE vs. SNR',
                   figure=plot_test_stats(var_name="SNR (dB)", stats=snr_stats))
 writer.add_figure(tag='MSE vs. SNR if Mismatch',
                   figure=plot_test_stats(var_name="SNR(dB)", stats=mismatched_stats))
-
-
-
-
-
-
