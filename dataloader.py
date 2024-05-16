@@ -29,6 +29,7 @@ class MatDataset(Dataset):
 
 
 def get_test_dataloaders(dataset_dir, batch_size):
+    """returns a list of dataloaders, each for a folder in dataset_dir"""
     test_datasets = [(sub_folder, MatDataset(os.path.join(dataset_dir, sub_folder)))
                         for sub_folder in os.listdir(dataset_dir)]
     test_dataloaders = [(name, DataLoader(test_dataset, batch_size=batch_size, shuffle=True))

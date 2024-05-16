@@ -15,7 +15,6 @@ args = parse_arguments()
 log_dir = "runs"
 writer = SummaryWriter(os.path.join(log_dir, args.exp_name))
 
-test_set_size_per_point = 2000
 batch_size = args.batch_size
 epoch = args.epoch
 model_dim = 128  # transformer linear projection dim
@@ -128,32 +127,27 @@ ds_stats = get_test_stats(
     encoder=encoder, patcher=patcher,
     inverse_patcher=inverse_patcher, tokenizer=tokenizer,
     test_dataloaders=ds_test_dataloaders,
-    device=device, var_name="DS",
-    test_set_size_per_point=test_set_size_per_point
-)
+    device=device, var_name="DS")
 
 mds_stats = get_test_stats(
     encoder=encoder, patcher=patcher,
     inverse_patcher=inverse_patcher, tokenizer=tokenizer,
     test_dataloaders=mds_test_dataloaders,
-    device=device, var_name="MDS",
-    test_set_size_per_point=test_set_size_per_point
+    device=device, var_name="MDS"
 )
 
 snr_stats = get_test_stats(
     encoder=encoder, patcher=patcher,
     inverse_patcher=inverse_patcher, tokenizer=tokenizer,
     test_dataloaders=snr_test_dataloaders,
-    device=device, var_name="SNR",
-    test_set_size_per_point=test_set_size_per_point
+    device=device, var_name="SNR"
 )
 
 mismatched_stats = get_test_stats(
     encoder=encoder, patcher=patcher,
     inverse_patcher=inverse_patcher, tokenizer=tokenizer,
     test_dataloaders=mismatched_test_dataloaders,
-    device=device, var_name="Mismatched",
-    test_set_size_per_point=test_set_size_per_point
+    device=device, var_name="Mismatched"
 )
 
 writer.add_figure(tag='MSE vs. Doppler Spread',

@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 
 
-def plot_test_stats(var_name, stats):
+def plot_test_stats(var_name, stats, show=False):
     x, y = [], []
     for key, value in stats.items():
         x.append(key)
@@ -10,4 +10,7 @@ def plot_test_stats(var_name, stats):
     plt.plot(x, y)
     plt.xlabel(var_name)
     plt.ylabel("MSE Error (dB)")
+    plt.grid()
+    if show:
+        plt.show()
     return fig

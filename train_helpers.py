@@ -4,9 +4,11 @@ import numpy as np
 
 def get_test_stats(
         encoder, patcher, inverse_patcher, tokenizer,
-        test_dataloaders, device, var_name, test_set_size_per_point):
+        test_dataloaders, device, var_name):
+    """For a given test loaders evaluate performance of the encoder for each test set and report"""
     stats = {}
     for name, test_dataloader in test_dataloaders:
+        test_set_size_per_point = len(test_dataloader.dataset)
         test_loss = 0.0
         encoder.eval()
         for batch in test_dataloader:
@@ -26,9 +28,10 @@ def get_test_stats(
             output = loss(estimated_channel, ideal_channel)
             test_loss += output.item() * batch[0].size(0)  # Accumulate batch loss
 
-        test_loss /= test_set_size_per_point  # Calculate average epoch loss
+        test_loss /= test_set_size_per_point  # Calculate average loss
         db_error = 20 * np.log10(test_loss)
         print(f"{var_name}:{name} Test MSE: {db_error:.4f} dB")
         stats[int(name)] = db_error
+    # sort by key
     stats = dict(sorted(stats.items()))
     return stats
