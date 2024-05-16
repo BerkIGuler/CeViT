@@ -33,3 +33,19 @@ def get_test_stats(
         print(f"{var_name}:{name} Test MSE: {db_error:.4f} dB")
         stats[int(name)] = db_error
     return stats
+
+
+def forward_pass(batch, device, patcher, tokenizer, encoder, inverse_patcher):
+    ls_channel, ideal_channel, meta_data = batch
+    ls_channel, ideal_channel = ls_channel.to(device), ideal_channel.to(device)
+    file_no, SNR, delay_spread, max_dop_shift, ch_type = meta_data
+    SNR, delay_spread, max_dop_shift = SNR.to(device), delay_spread.to(device), max_dop_shift.to(device)
+
+    ls_channel = patcher(ls_channel)
+    token_encodings = tokenizer(SNR, delay_spread, max_dop_shift)
+    model_input = torch.cat(tensors=(ls_channel, token_encodings), dim=2)
+
+    encoder_output = encoder(model_input)
+    estimated_channel = inverse_patcher(encoder_output)
+
+    return estimated_channel, ideal_channel

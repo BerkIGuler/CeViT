@@ -1,12 +1,11 @@
 import os
 import torch
-import numpy as np
 from preprocess import PatchEmbedding, InversePatchEmbedding
 from dataloader import MatDataset, get_test_dataloaders
 from torch.utils.data import DataLoader
 from token_module import TokenModule
 from model import Encoder
-from train_helpers import get_test_stats
+from train_helpers import get_test_stats, forward_pass
 from plot_helpers import plot_test_stats
 from torch.utils.tensorboard import SummaryWriter
 from parser import parse_arguments
@@ -64,25 +63,18 @@ encoder = Encoder(
     dropout=dropout).to(device)
 
 optimizer = torch.optim.Adam(encoder.parameters(), lr=1e-3)
+loss = torch.nn.MSELoss()
 
 for ep in range(epoch):
     train_loss = 0.0
     encoder.train()
     for batch in train_dataloader:
         optimizer.zero_grad()
-        ls_channel, ideal_channel, meta_data = batch
-        ls_channel, ideal_channel = ls_channel.to(device), ideal_channel.to(device)
-        file_no, SNR, delay_spread, max_dop_shift, ch_type = meta_data
-        SNR, delay_spread, max_dop_shift = SNR.to(device), delay_spread.to(device), max_dop_shift.to(device)
 
-        ls_channel = patcher(ls_channel)
-        token_encodings = tokenizer(SNR, delay_spread, max_dop_shift)
-        model_input = torch.cat(tensors=(ls_channel, token_encodings), dim=2)
+        estimated_channel, ideal_channel = forward_pass(
+            batch, device, patcher,
+            tokenizer, encoder, inverse_patcher)
 
-        encoder_output = encoder(model_input)
-        estimated_channel = inverse_patcher(encoder_output)
-
-        loss = torch.nn.MSELoss()
         output = loss(estimated_channel, ideal_channel)
         output.backward()
 
@@ -93,23 +85,14 @@ for ep in range(epoch):
     writer.add_scalar(tag='training loss',
                       scalar_value=train_loss,
                       global_step=ep + 1)
-    print(f"Train [{ep+1}/{epoch}], Loss: {train_loss}")
-    print(f"Train [{ep + 1}/{epoch}], MSE Error: {20 * np.log10(train_loss):.4f} dB")
 
     val_loss = 0.0
     encoder.eval()
     for batch in val_dataloader:
-        ls_channel, ideal_channel, meta_data = batch
-        ls_channel, ideal_channel = ls_channel.to(device), ideal_channel.to(device)
-        file_no, SNR, delay_spread, max_dop_shift, ch_type = meta_data
-        SNR, delay_spread, max_dop_shift = SNR.to(device), delay_spread.to(device), max_dop_shift.to(device)
 
-        ls_channel = patcher(ls_channel)
-        token_encodings = tokenizer(SNR, delay_spread, max_dop_shift)
-        model_input = torch.cat(tensors=(ls_channel, token_encodings), dim=2)
-
-        encoder_output = encoder(model_input)
-        estimated_channel = inverse_patcher(encoder_output)
+        estimated_channel, ideal_channel = forward_pass(
+            batch, device, patcher,
+            tokenizer, encoder, inverse_patcher)
 
         loss = torch.nn.MSELoss()
         output = loss(estimated_channel, ideal_channel)
@@ -119,8 +102,6 @@ for ep in range(epoch):
     writer.add_scalar(tag='val loss',
                       scalar_value=val_loss,
                       global_step=ep + 1)
-    print(f"Val [{ep+1}/{epoch}], Loss: {val_loss}")
-    print(f"Val [{ep+1}/{epoch}], Error: {20 * np.log10(val_loss):.4f} dB")
 
 
 ds_stats = get_test_stats(
