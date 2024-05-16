@@ -32,6 +32,4 @@ def get_test_stats(
         db_error = 20 * np.log10(test_loss)
         print(f"{var_name}:{name} Test MSE: {db_error:.4f} dB")
         stats[int(name)] = db_error
-    # sort by key
-    stats = dict(sorted(stats.items()))
     return stats

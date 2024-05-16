@@ -23,5 +23,5 @@ def get_mse_per_folder(folders_dir):
             ideal = mat_data[:, :, 1]
             mse_sum += mse(ls_estimate, ideal)
         mse_sum /= folder_size
-        mse_sums[folder] = mse_sum
+        mse_sums[int(folder)] = mse_sum
     return mse_sums

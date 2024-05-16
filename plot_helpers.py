@@ -2,12 +2,14 @@ import matplotlib.pyplot as plt
 
 
 def plot_test_stats(var_name, stats, show=False):
-    x, y = [], []
-    for key, value in stats.items():
-        x.append(key)
-        y.append(value)
+    kv_pairs = sorted(list(stats.items()), key=lambda x: x[0])
+    x_vals = []
+    y_vals = []
+    for key, value in kv_pairs:
+        x_vals.append(key)
+        y_vals.append(value)
     fig = plt.figure()
-    plt.plot(x, y)
+    plt.plot(x_vals, y_vals)
     plt.xlabel(var_name)
     plt.ylabel("MSE Error (dB)")
     plt.grid()
