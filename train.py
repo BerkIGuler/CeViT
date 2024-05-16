@@ -1,3 +1,4 @@
+import os
 import torch
 import numpy as np
 from preprocess import PatchEmbedding, InversePatchEmbedding
@@ -7,6 +8,12 @@ from token_module import TokenModule
 from model import Encoder
 from train_helpers import get_test_stats
 from plot_helpers import plot_test_stats
+from torch.utils.tensorboard import SummaryWriter
+from parser import parse_arguments
+
+args = parse_arguments()
+log_dir = "runs"
+writer = SummaryWriter(os.path.join(log_dir, args.exp_name))
 
 test_set_size_per_point = 2000
 batch_size = 32
@@ -19,15 +26,17 @@ dropout = 0.1
 token_embedding_dim = 168
 device = "cuda:0"
 
+parent_dir = os.path.dirname(os.getcwd())
+
 # train and val set folders
-train_data_dir = "train_dataset"
-val_data_dir = "val_dataset"
+train_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "train_dataset")
+val_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "val_dataset")
 
 # test set folders
-ds_test_data_dir = "ds_test_dataset"
-mds_test_data_dir = "mds_test_dataset"
-snr_test_data_dir = "snr_test_dataset"
-mismatched_test_data_dir = "mismatched_test_dataset"
+ds_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "ds_test_dataset")
+mds_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "mds_test_dataset")
+snr_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "snr_test_dataset")
+mismatched_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "mismatched_test_dataset")
 
 # train dataloader
 train_dataset = MatDataset(train_data_dir)
@@ -82,6 +91,9 @@ for ep in range(epoch):
         train_loss += output.item() * batch[0].size(0)  # Accumulate batch loss
 
     train_loss /= len(train_dataset)  # Calculate average epoch loss
+    writer.add_scalar(tag='training loss',
+                      scalar_value=train_loss,
+                      global_step=ep + 1)
     print(f"Train [{ep+1}/{epoch}], Loss: {train_loss}")
     print(f"Train [{ep + 1}/{epoch}], MSE Error: {20 * np.log10(train_loss):.4f} dB")
 
@@ -105,6 +117,9 @@ for ep in range(epoch):
         val_loss += output.item() * batch[0].size(0)  # Accumulate batch loss
 
     val_loss /= len(val_dataset)  # Calculate average epoch loss
+    writer.add_scalar(tag='val loss',
+                      scalar_value=val_loss,
+                      global_step=ep + 1)
     print(f"Val [{ep+1}/{epoch}], Loss: {val_loss}")
     print(f"Val [{ep+1}/{epoch}], Error: {20 * np.log10(val_loss):.4f} dB")
 
@@ -141,7 +156,17 @@ mismatched_stats = get_test_stats(
     test_set_size_per_point=test_set_size_per_point
 )
 
-plot_test_stats(var_name="Doppler Spread (ns)", stats=ds_stats)
-plot_test_stats(var_name="Max. Doppler Shift (Hz)", stats=mds_stats)
-plot_test_stats(var_name="SNR (dB)", stats=snr_stats)
-plot_test_stats(var_name="SNR(dB)", stats=mismatched_stats)
+writer.add_figure(tag='MSE vs. Doppler Spread',
+                  figure=plot_test_stats(var_name="Doppler Spread (ns)", stats=ds_stats))
+writer.add_figure(tag='MSE vs. Max. Doppler Shift',
+                  figure=plot_test_stats(var_name="Max. Doppler Shift (Hz)", stats=mds_stats))
+writer.add_figure(tag='MSE vs. SNR',
+                  figure=plot_test_stats(var_name="SNR (dB)", stats=snr_stats))
+writer.add_figure(tag='MSE vs. SNR if Mismatch',
+                  figure=plot_test_stats(var_name="SNR(dB)", stats=mismatched_stats))
+
+
+
+
+
+
