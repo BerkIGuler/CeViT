@@ -5,137 +5,145 @@ from dataloader import MatDataset, get_test_dataloaders
 from torch.utils.data import DataLoader
 from token_module import TokenModule
 from model import Encoder
-from train_helpers import get_test_stats, forward_pass
+from train_helpers import get_all_test_stats, forward_pass
 from plot_helpers import plot_test_stats
 from torch.utils.tensorboard import SummaryWriter
 from parser import parse_arguments
-
-args = parse_arguments()
-log_dir = "runs"
-writer = SummaryWriter(os.path.join(log_dir, args.exp_name))
-
-batch_size = args.batch_size
-epoch = args.epoch
-model_dim = 128  # transformer linear projection dim
-n_head = 4
-patch_dim = 40  # patch embedding dim
-input_dim = 46
-dropout = 0.1
-token_embedding_dim = 168
-device = "cuda:0"
-
-parent_dir = os.path.dirname(os.getcwd())
-
-# train and val set folders
-train_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "train_dataset")
-val_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "val_dataset")
-
-# test set folders
-ds_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "ds_test_dataset")
-mds_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "mds_test_dataset")
-snr_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "snr_test_dataset")
-mismatched_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "mismatched_test_dataset")
-
-# train dataloader
-train_dataset = MatDataset(train_data_dir)
-train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-
-# val dataloader
-val_dataset = MatDataset(val_data_dir)
-val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
-
-# test dataloaders
-ds_test_dataloaders = get_test_dataloaders(ds_test_data_dir, batch_size=batch_size)
-mds_test_dataloaders = get_test_dataloaders(mds_test_data_dir, batch_size=batch_size)
-snr_test_dataloaders = get_test_dataloaders(snr_test_data_dir, batch_size=batch_size)
-mismatched_test_dataloaders = get_test_dataloaders(mismatched_test_data_dir, batch_size=batch_size)
-
-# modules
-patcher = PatchEmbedding().to(device)
-inverse_patcher = InversePatchEmbedding().to(device)
-tokenizer = TokenModule(input_size=1, embedding_dim=token_embedding_dim).to(device)
-encoder = Encoder(
-    input_dim=input_dim,
-    output_dim=patch_dim,
-    d_model=model_dim,
-    nhead=n_head,
-    activation="gelu",
-    dropout=dropout).to(device)
-
-optimizer = torch.optim.Adam(encoder.parameters(), lr=1e-3)
-loss = torch.nn.MSELoss()
-
-for ep in range(epoch):
-    train_loss = 0.0
-    encoder.train()
-    for batch in train_dataloader:
-        optimizer.zero_grad()
-
-        estimated_channel, ideal_channel = forward_pass(
-            batch, device, patcher,
-            tokenizer, encoder, inverse_patcher)
-
-        output = loss(estimated_channel, ideal_channel)
-        output.backward()
-
-        optimizer.step()
-        train_loss += output.item() * batch[0].size(0)  # Accumulate batch loss
-
-    train_loss /= len(train_dataset)  # Calculate average epoch loss
-    writer.add_scalar(tag='training loss',
-                      scalar_value=train_loss,
-                      global_step=ep + 1)
-
-    val_loss = 0.0
-    encoder.eval()
-    for batch in val_dataloader:
-
-        estimated_channel, ideal_channel = forward_pass(
-            batch, device, patcher,
-            tokenizer, encoder, inverse_patcher)
-
-        loss = torch.nn.MSELoss()
-        output = loss(estimated_channel, ideal_channel)
-        val_loss += output.item() * batch[0].size(0)  # Accumulate batch loss
-
-    val_loss /= len(val_dataset)  # Calculate average epoch loss
-    writer.add_scalar(tag='val loss',
-                      scalar_value=val_loss,
-                      global_step=ep + 1)
+from utils import get_mse_per_folder
 
 
-ds_stats = get_test_stats(
-    encoder=encoder, patcher=patcher,
-    inverse_patcher=inverse_patcher, tokenizer=tokenizer,
-    test_dataloaders=ds_test_dataloaders,
-    device=device, var_name="DS")
+def main():
+    args = parse_arguments()
+    log_dir = "runs"
+    exp_name = f"{args.model_name}_data-{args.dataset_version}_ep-{args.epoch}_bs-{args.batch_size}"
+    writer = SummaryWriter(os.path.join(log_dir, exp_name))
 
-mds_stats = get_test_stats(
-    encoder=encoder, patcher=patcher,
-    inverse_patcher=inverse_patcher, tokenizer=tokenizer,
-    test_dataloaders=mds_test_dataloaders,
-    device=device, var_name="MDS"
-)
+    batch_size = args.batch_size
+    epoch = args.epoch
+    model_dim = 128  # transformer linear projection dim
+    n_head = 4
+    patch_dim = 40  # patch embedding dim
+    input_dim = 46
+    dropout = 0.1
+    token_embedding_dim = 168
+    device = "cuda:0"
 
-snr_stats = get_test_stats(
-    encoder=encoder, patcher=patcher,
-    inverse_patcher=inverse_patcher, tokenizer=tokenizer,
-    test_dataloaders=snr_test_dataloaders,
-    device=device, var_name="SNR"
-)
+    parent_dir = os.path.dirname(os.getcwd())
 
-mismatched_stats = get_test_stats(
-    encoder=encoder, patcher=patcher,
-    inverse_patcher=inverse_patcher, tokenizer=tokenizer,
-    test_dataloaders=mismatched_test_dataloaders,
-    device=device, var_name="Mismatched"
-)
+    # train and val set folders
+    train_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "train_dataset")
+    val_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "val_dataset")
 
-writer.add_figure(tag='MSE vs. Doppler Spread',
-                  figure=plot_test_stats(var_name="Doppler Spread (ns)", stats=ds_stats))
-writer.add_figure(tag='MSE vs. Max. Doppler Shift',
-                  figure=plot_test_stats(var_name="Max. Doppler Shift (Hz)", stats=mds_stats))
-writer.add_figure(tag='MSE vs. SNR',
-                  figure=plot_test_stats(var_name="SNR (dB)", stats=snr_stats))
-writer.add_figure(tag='MSE vs. SNR if Mismatch',
-                  figure=plot_test_stats(var_name="SNR(dB)", stats=mismatched_stats))
+    # test set folders
+    ds_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "ds_test_dataset")
+    mds_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "mds_test_dataset")
+    snr_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "snr_test_dataset")
+    mismatched_test_data_dir = os.path.join(parent_dir, "datasets", args.dataset_version, "mismatched_test_dataset")
+
+    # train dataloader
+    train_dataset = MatDataset(train_data_dir)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+
+    # val dataloader
+    val_dataset = MatDataset(val_data_dir)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+
+    # test dataloaders
+    ds_test_dataloaders = get_test_dataloaders(ds_test_data_dir, batch_size=batch_size)
+    mds_test_dataloaders = get_test_dataloaders(mds_test_data_dir, batch_size=batch_size)
+    snr_test_dataloaders = get_test_dataloaders(snr_test_data_dir, batch_size=batch_size)
+    mismatched_test_dataloaders = get_test_dataloaders(mismatched_test_data_dir, batch_size=batch_size)
+    test_dataloaders = [
+        ds_test_dataloaders,
+        mds_test_dataloaders,
+        snr_test_dataloaders,
+        mismatched_test_dataloaders
+    ]
+
+    # modules
+    patcher = PatchEmbedding().to(device)
+    inverse_patcher = InversePatchEmbedding().to(device)
+    tokenizer = TokenModule(input_size=1, embedding_dim=token_embedding_dim).to(device)
+    encoder = Encoder(
+        input_dim=input_dim,
+        output_dim=patch_dim,
+        d_model=model_dim,
+        nhead=n_head,
+        activation="gelu",
+        dropout=dropout).to(device)
+
+    optimizer = torch.optim.Adam(encoder.parameters(), lr=1e-3)
+    loss = torch.nn.MSELoss()
+
+    for ep in range(epoch):
+        train_loss = 0.0
+        encoder.train()
+        for batch in train_dataloader:
+            optimizer.zero_grad()
+
+            estimated_channel, ideal_channel = forward_pass(
+                batch, device, patcher,
+                tokenizer, encoder, inverse_patcher)
+
+            output = loss(estimated_channel, ideal_channel)
+            output.backward()
+
+            optimizer.step()
+            train_loss += output.item() * batch[0].size(0)  # Accumulate batch loss
+
+        train_loss /= len(train_dataset)  # Calculate average epoch loss
+        writer.add_scalar(tag='training loss',
+                          scalar_value=train_loss,
+                          global_step=ep + 1)
+
+        val_loss = 0.0
+        encoder.eval()
+        for batch in val_dataloader:
+
+            estimated_channel, ideal_channel = forward_pass(
+                batch, device, patcher,
+                tokenizer, encoder, inverse_patcher)
+
+            loss = torch.nn.MSELoss()
+            output = loss(estimated_channel, ideal_channel)
+            val_loss += output.item() * batch[0].size(0)  # Accumulate batch loss
+
+        val_loss /= len(val_dataset)  # Calculate average epoch loss
+        writer.add_scalar(tag='val loss',
+                          scalar_value=val_loss,
+                          global_step=ep + 1)
+
+    ds_stats, mds_stats, snr_stats, mismatched_stats = get_all_test_stats(
+            encoder, patcher, inverse_patcher, tokenizer,
+            test_dataloaders, device)
+
+    ds_ls_stats = get_mse_per_folder(ds_test_data_dir)
+    mds_ls_stats = get_mse_per_folder(mds_test_data_dir)
+    snr_ls_stats = get_mse_per_folder(snr_test_data_dir)
+    mismatched_ls_stats = get_mse_per_folder(mismatched_test_data_dir)
+
+
+    writer.add_figure(tag='MSE vs. Doppler Spread',
+                      figure=plot_test_stats(
+                          x_name="Doppler Spread (ns)",
+                          stats=[ds_stats, ds_ls_stats],
+                          methods=["CE-ViT", "LS"]))
+    writer.add_figure(tag='MSE vs. Max. Doppler Shift',
+                      figure=plot_test_stats(
+                          x_name="Max. Doppler Shift (Hz)",
+                          stats=[mds_stats, mds_ls_stats],
+                          methods=["CE-ViT", "LS"]))
+    writer.add_figure(tag='MSE vs. SNR',
+                      figure=plot_test_stats(
+                          x_name="SNR (dB)",
+                          stats=[snr_stats, snr_ls_stats],
+                          methods=["CE-ViT", "LS"]))
+    writer.add_figure(tag='MSE vs. SNR if Mismatch',
+                      figure=plot_test_stats(
+                          x_name="SNR(dB)",
+                          stats=[mismatched_stats, mismatched_ls_stats],
+                          methods=["CE-ViT", "LS"]))
+
+
+if __name__ == "__main__":
+    main()

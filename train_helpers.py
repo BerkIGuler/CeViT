@@ -2,6 +2,40 @@ import torch
 import numpy as np
 
 
+def get_all_test_stats(
+        encoder, patcher, inverse_patcher, tokenizer,
+        test_dataloaders, device):
+
+    ds_stats = get_test_stats(
+        encoder=encoder, patcher=patcher,
+        inverse_patcher=inverse_patcher, tokenizer=tokenizer,
+        test_dataloaders=test_dataloaders[0],
+        device=device, var_name="DS")
+
+    mds_stats = get_test_stats(
+        encoder=encoder, patcher=patcher,
+        inverse_patcher=inverse_patcher, tokenizer=tokenizer,
+        test_dataloaders=test_dataloaders[1],
+        device=device, var_name="MDS"
+    )
+
+    snr_stats = get_test_stats(
+        encoder=encoder, patcher=patcher,
+        inverse_patcher=inverse_patcher, tokenizer=tokenizer,
+        test_dataloaders=test_dataloaders[2],
+        device=device, var_name="SNR"
+    )
+
+    mismatched_stats = get_test_stats(
+        encoder=encoder, patcher=patcher,
+        inverse_patcher=inverse_patcher, tokenizer=tokenizer,
+        test_dataloaders=test_dataloaders[3],
+        device=device, var_name="Mismatched"
+    )
+
+    return ds_stats, mds_stats, snr_stats, mismatched_stats
+
+
 def get_test_stats(
         encoder, patcher, inverse_patcher, tokenizer,
         test_dataloaders, device, var_name):

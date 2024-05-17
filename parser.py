@@ -11,9 +11,9 @@ def parse_arguments():
         choices=["v1", "v2"],
         help='Determines which dataset to use')
     parser.add_argument(
-        '--exp_name',
+        '--model_name',
         type=str, required=True,
-        help='Experiment name to name the log file')
+        help='model name to name the log file')
     parser.add_argument(
         '--epoch',
         type=int, default=10,
