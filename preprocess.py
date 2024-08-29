@@ -4,25 +4,28 @@ import re
 
 
 def extract_values(file_name):
-    """extract channel info from channel data file name
+    """extract channel info from file name
 
     :param file_name:
         str: file name
     :return
         tuple: channel info with fields
-            (file_number, snr, delay_spread, max_doppler_shift, channel_type)
+            (file_number, snr, delay_spread, max_doppler_shift,
+             pilot placement frequency along subcarriers, channel_type)
     """
-    pattern = r'(\d+)_SNR-(\d+)_DS-(\d+)_DOP-(\d+)_([A-Z\-]+)\.mat'
+
+    pattern = r'(\d+)_SNR-(\d+)_DS-(\d+)_DOP-(\d+)_N-(\d+)_([A-Z\-]+)\.mat'
     match = re.match(pattern, file_name)
     if match:
         file_no = torch.tensor([int(match.group(1))], dtype=torch.float)
         snr_value = torch.tensor([int(match.group(2))], dtype=torch.float)
         ds_value = torch.tensor([int(match.group(3))], dtype=torch.float)
         dop_value = torch.tensor([int(match.group(4))], dtype=torch.float)
-        channel_type = [match.group(5)]
-        return file_no, snr_value, ds_value, dop_value, channel_type
+        n = torch.tensor([int(match.group(5))], dtype=torch.float)
+        channel_type = [match.group(6)]
+        return file_no, snr_value, ds_value, dop_value, n, channel_type
     else:
-        return None
+        raise ValueError("Cannot extract file information.")
 
 
 def concat_complex_channel(channel_matrix):
@@ -64,7 +67,7 @@ class PatchEmbedding(nn.Module):
 
 
 class InversePatchEmbedding(nn.Module):
-    """Recovers matrix from path embeddings"""
+    """Recovers matrix from patch embeddings"""
     def __init__(self, output_size=(120, 28), patch_size=(10, 4)):
         super().__init__()
         self.fold = torch.nn.Fold(

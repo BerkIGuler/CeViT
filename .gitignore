@@ -1,4 +1,4 @@
 .idea/
-data/
 .git/
+runs/
 __pycache__/

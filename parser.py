@@ -4,16 +4,10 @@ import argparse
 def parse_arguments():
     parser = argparse.ArgumentParser(description='Trains a transformer model for OFDM channel estimation')
 
-    # Add your arguments here
-    parser.add_argument(
-        '--dataset_version',
-        type=str, required=True,
-        choices=["v1", "v2"],
-        help='Determines which dataset to use')
     parser.add_argument(
         '--model_name',
         type=str, required=True,
-        help='model name to name the log file')
+        help='model name for the log file')
     parser.add_argument(
         '--epoch',
         type=int, default=10,
