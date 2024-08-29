@@ -83,14 +83,14 @@ def main():
 
         val_loss = eval_model(
             encoder, val_dataloader, device,
-            patcher, tokenizer, inverse_patcher)
+            patcher, tokenizer, inverse_patcher, loss)
         writer.add_scalar(tag='val loss',
                           scalar_value=val_loss,
                           global_step=ep + 1)
 
     ds_stats, mds_stats, snr_stats = get_all_test_stats(
             encoder, patcher, inverse_patcher, tokenizer,
-            test_dataloaders, device)
+            test_dataloaders, device, loss)
 
     ds_ls_stats = get_mse_per_folder(ds_test_data_dir)
     mds_ls_stats = get_mse_per_folder(mds_test_data_dir)

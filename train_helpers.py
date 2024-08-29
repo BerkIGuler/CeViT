@@ -1,30 +1,29 @@
 import torch
-import numpy as np
 from utils import to_db
 
 
 def get_all_test_stats(
         encoder, patcher, inverse_patcher, tokenizer,
-        test_dataloaders, device):
+        test_dataloaders, device, loss):
 
     ds_stats = get_test_stats(
         encoder=encoder, patcher=patcher,
         inverse_patcher=inverse_patcher, tokenizer=tokenizer,
         test_dataloaders=test_dataloaders["DS"],
-        device=device)
+        device=device, loss=loss)
 
     mds_stats = get_test_stats(
         encoder=encoder, patcher=patcher,
         inverse_patcher=inverse_patcher, tokenizer=tokenizer,
         test_dataloaders=test_dataloaders["MDS"],
-        device=device
+        device=device, loss=loss
     )
 
     snr_stats = get_test_stats(
         encoder=encoder, patcher=patcher,
         inverse_patcher=inverse_patcher, tokenizer=tokenizer,
         test_dataloaders=test_dataloaders["SNR"],
-        device=device
+        device=device, loss=loss
     )
 
     return ds_stats, mds_stats, snr_stats
@@ -32,7 +31,7 @@ def get_all_test_stats(
 
 def get_test_stats(
         encoder, patcher, inverse_patcher, tokenizer,
-        test_dataloaders, device):
+        test_dataloaders, device, loss):
     """For a given test loaders evaluate performance of the encoder for each test set and report"""
     stats = {}
     test_dataloaders = sorted(test_dataloaders, key=lambda x: int(x[0].split("_")[1]))
@@ -40,25 +39,22 @@ def get_test_stats(
         var, val = name.split("_")
         test_loss = eval_model(
             encoder, test_dataloader, device,
-            patcher, tokenizer, inverse_patcher)
+            patcher, tokenizer, inverse_patcher, loss)
         db_error = to_db(test_loss)
         print(f"{var}:{val} Test MSE: {db_error:.4f} dB")
         stats[int(val)] = db_error
     return stats
 
 
-def eval_model(encoder, eval_dataloader, device, patcher, tokenizer, inverse_patcher):
+def eval_model(encoder, eval_dataloader, device, patcher, tokenizer, inverse_patcher, loss):
     eval_loss = 0.0
     encoder.eval()
     for batch in eval_dataloader:
         estimated_channel, ideal_channel = forward_pass(
             batch, device, patcher, tokenizer,
             encoder, inverse_patcher)
-
-        loss = torch.nn.MSELoss()
         output = loss(estimated_channel, ideal_channel)
         eval_loss += output.item() * batch[0].size(0)  # Accumulate batch loss
-
     eval_loss /= len(eval_dataloader.dataset)  # Calculate average loss
     return eval_loss
 
