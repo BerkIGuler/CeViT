@@ -1,1 +1,1 @@
-python3 train.py --epoch 5 --batch_size 64 --model_name cevit
+python3 train.py --max_epoch 1000 --batch_size 512 --model_name ce-vit --patience 50 --test_every_n 10

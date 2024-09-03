@@ -40,7 +40,9 @@ def get_test_stats(
         test_loss = eval_model(
             encoder, test_dataloader, device,
             patcher, tokenizer, inverse_patcher, loss)
-        db_error = to_db(test_loss)
+        # complex mse for N complex elements = 2 x mse for 2N real elements
+        complex_mse_loss = 2 * test_loss
+        db_error = to_db(complex_mse_loss)
         print(f"{var}:{val} Test MSE: {db_error:.4f} dB")
         stats[int(val)] = db_error
     return stats

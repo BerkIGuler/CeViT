@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.io as sio
 import os
+from prettytable import PrettyTable
 
 
 def to_db(val):
@@ -32,3 +33,17 @@ def get_mse_per_folder(folders_dir):
         mse_sum /= folder_size
         mse_sums[int(val)] = mse_sum
     return mse_sums
+
+
+def count_parameters(model):
+    table = PrettyTable(["Modules", "Parameters"])
+    total_params = 0
+    for name, parameter in model.named_parameters():
+        if not parameter.requires_grad:
+            continue
+        params = parameter.numel()
+        table.add_row([name, params])
+        total_params += params
+    print(table)
+    print(f"Total Trainable Params: {total_params}")
+    return total_params
