@@ -35,8 +35,8 @@ def main():
     parent_dir = os.path.dirname(os.getcwd())
 
     # train and val set folders
-    train_data_dir = os.path.join(parent_dir, "datasets", "train_large")
-    val_data_dir = os.path.join(parent_dir, "datasets", "val_large")
+    train_data_dir = os.path.join(parent_dir, "datasets", "train")
+    val_data_dir = os.path.join(parent_dir, "datasets", "val")
 
     # test set folders
     ds_test_data_dir = os.path.join(parent_dir, "datasets", "test", "DS_test_set")
@@ -72,6 +72,7 @@ def main():
         nhead=n_head,
         activation="gelu",
         dropout=dropout).to(device)
+
     count_parameters(encoder)
     early_stopper = EarlyStopping(patience)
     optimizer = torch.optim.Adam(encoder.parameters(), lr=1e-3)

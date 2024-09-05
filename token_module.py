@@ -33,9 +33,9 @@ class TokenModule(nn.Module):
 
 
 if __name__ == "__main__":
-    SNR = torch.tensor([100], dtype=torch.float32)
-    DS = torch.tensor([50], dtype=torch.float32)
-    DOP = torch.tensor([300], dtype=torch.float32)
+    SNR = torch.rand(16, 1)
+    DS = torch.rand(16, 1)
+    DOP = torch.rand(16, 1)
     tokenizer = TokenModule(input_size=1, embedding_dim=168)
     token_encodings = tokenizer(SNR, DS, DOP)
     print(token_encodings.shape)

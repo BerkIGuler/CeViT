@@ -80,3 +80,15 @@ class InversePatchEmbedding(nn.Module):
         x = self.fold(x)
         x = torch.squeeze(x, dim=1)
         return x
+
+
+if __name__ == "__main__":
+    patcher = PatchEmbedding()
+    inverse_patcher = InversePatchEmbedding()
+    rand_input = torch.rand(16, 120, 28)
+    print(rand_input.size())
+    output = patcher(rand_input)
+    print(output.size())
+    inverse = inverse_patcher(output)
+    print(inverse.size())
+    assert (inverse - rand_input).sum() == torch.tensor(0)
