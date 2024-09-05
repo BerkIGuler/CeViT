@@ -1,5 +1,4 @@
 import torch
-from torch import nn
 import re
 
 
@@ -51,44 +50,3 @@ def inverse_concat_complex_channel(channel_matrix):
     imag_channel_m = channel_matrix[:, :, real_to_imag_idx:]
     complex_channel_m = torch.complex(real_channel_m, imag_channel_m)
     return complex_channel_m
-
-
-class PatchEmbedding(nn.Module):
-    """Reorganizes channel matrix using the same idea from ViT"""
-    def __init__(self, patch_size=(10, 4)):
-        super().__init__()
-        self.p = patch_size
-        self.unfold = torch.nn.Unfold(kernel_size=patch_size, stride=patch_size)
-
-    def forward(self, x):
-        x = self.unfold(torch.unsqueeze(x, dim=1))
-        x = torch.permute(x, dims=(0, 2, 1))
-        return x
-
-
-class InversePatchEmbedding(nn.Module):
-    """Recovers matrix from patch embeddings"""
-    def __init__(self, output_size=(120, 28), patch_size=(10, 4)):
-        super().__init__()
-        self.fold = torch.nn.Fold(
-            output_size=output_size,
-            kernel_size=patch_size,
-            stride=patch_size)
-
-    def forward(self, x):
-        x = torch.permute(x, dims=(0, 2, 1))
-        x = self.fold(x)
-        x = torch.squeeze(x, dim=1)
-        return x
-
-
-if __name__ == "__main__":
-    patcher = PatchEmbedding()
-    inverse_patcher = InversePatchEmbedding()
-    rand_input = torch.rand(16, 120, 28)
-    print(rand_input.size())
-    output = patcher(rand_input)
-    print(output.size())
-    inverse = inverse_patcher(output)
-    print(inverse.size())
-    assert (inverse - rand_input).sum() == torch.tensor(0)

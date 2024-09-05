@@ -1,10 +1,9 @@
 import os
 import torch
-from preprocess import PatchEmbedding, InversePatchEmbedding
 from dataloader import MatDataset, get_test_dataloaders
 from torch.utils.data import DataLoader
-from token_module import TokenModule
-from model import Encoder, EarlyStopping
+from model import CeViT
+from utils import EarlyStopping
 from train_helpers import get_all_test_stats, train_model, eval_model
 from plot_helpers import plot_test_stats
 from torch.utils.tensorboard import SummaryWriter
@@ -61,35 +60,20 @@ def main():
         "SNR": snr_test_dataloaders,
     }
 
-    # modules
-    patcher = PatchEmbedding().to(device)
-    inverse_patcher = InversePatchEmbedding().to(device)
-    tokenizer = TokenModule(input_size=1, embedding_dim=token_embedding_dim).to(device)
-    encoder = Encoder(
-        input_dim=input_dim,
-        output_dim=patch_dim,
-        d_model=model_dim,
-        nhead=n_head,
-        activation="gelu",
-        dropout=dropout).to(device)
-
-    count_parameters(encoder)
+    cevit_model = CeViT(device, token_embedding_dim, input_dim, patch_dim, model_dim, n_head, dropout)
+    count_parameters(cevit_model)
     early_stopper = EarlyStopping(patience)
-    optimizer = torch.optim.Adam(encoder.parameters(), lr=1e-3)
+    optimizer = torch.optim.Adam(cevit_model.parameters(), lr=1e-3)
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9954)
     loss = torch.nn.MSELoss()
 
     for ep in range(max_epoch):
-        train_loss = train_model(
-            encoder, optimizer, loss, scheduler, train_dataloader,
-            device, patcher, tokenizer, inverse_patcher)
+        train_loss = train_model(cevit_model, optimizer, loss, scheduler, train_dataloader)
         writer.add_scalar(tag='train loss',
                           scalar_value=train_loss,
                           global_step=ep + 1)
 
-        val_loss = eval_model(
-            encoder, val_dataloader, device,
-            patcher, tokenizer, inverse_patcher, loss)
+        val_loss = eval_model(cevit_model, val_dataloader, loss)
         writer.add_scalar(tag='val loss',
                           scalar_value=val_loss,
                           global_step=ep + 1)
@@ -97,9 +81,7 @@ def main():
             break
 
         if (ep + 1) % test_every_n_epoch == 0:
-            ds_stats, mds_stats, snr_stats = get_all_test_stats(
-                    encoder, patcher, inverse_patcher, tokenizer,
-                    test_dataloaders, device, loss)
+            ds_stats, mds_stats, snr_stats = get_all_test_stats(cevit_model, test_dataloaders, loss)
 
             ds_ls_stats = get_mse_per_folder(ds_test_data_dir)
             mds_ls_stats = get_mse_per_folder(mds_test_data_dir)

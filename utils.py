@@ -47,3 +47,26 @@ def count_parameters(model):
     print(table)
     print(f"Total Trainable Params: {total_params}")
     return total_params
+
+
+class EarlyStopping:
+    def __init__(self, patience=3):
+        self.patience = patience
+        self.remaining_patience = patience
+        self.min_loss = None
+
+    def early_stop(self, loss):
+        return_val = False
+
+        if self.min_loss is None:
+            self.min_loss = loss
+        elif loss < self.min_loss:
+            self.min_loss = loss
+            self.remaining_patience = self.patience
+        else:
+            self.remaining_patience -= 1
+
+        if self.remaining_patience == 0:
+            return_val = True
+
+        return return_val
