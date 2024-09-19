@@ -2,12 +2,20 @@ import argparse
 
 
 def parse_arguments():
-    parser = argparse.ArgumentParser(description='Trains a transformer model for OFDM channel estimation')
+    parser = argparse.ArgumentParser(description='Trains CeViT for OFDM channel estimation')
 
     parser.add_argument(
-        '--model_name',
+        '--train_set',
         type=str, required=True,
-        help='model name for the log file')
+        help='train set folder name')
+    parser.add_argument(
+        '--val_set',
+        type=str, required=True,
+        help='val set folder name')
+    parser.add_argument(
+        '--test_set',
+        type=str, required=True,
+        help='test set folder name')
     parser.add_argument(
         '--test_every_n',
         type=int, default=10,
@@ -24,6 +32,14 @@ def parse_arguments():
         '--batch_size',
         type=int, default=64,
         help='Batch size')
+    parser.add_argument(
+        '--cuda',
+        type=int, default=0,
+        help='Which CUDA interface to use, Always 0 for single GPU machines')
+    parser.add_argument(
+        '--lr',
+        type=float, default=1e-3,
+        help='initial learning rate')
 
     args = parser.parse_args()
     return args

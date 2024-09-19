@@ -35,7 +35,7 @@ def get_mse_per_folder(folders_dir):
     return mse_sums
 
 
-def count_parameters(model):
+def get_model_details(model):
     table = PrettyTable(["Modules", "Parameters"])
     total_params = 0
     for name, parameter in model.named_parameters():
@@ -44,9 +44,8 @@ def count_parameters(model):
         params = parameter.numel()
         table.add_row([name, params])
         total_params += params
-    print(table)
-    print(f"Total Trainable Params: {total_params}")
-    return total_params
+    return total_params, table.__repr__()
+
 
 
 class EarlyStopping:

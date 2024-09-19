@@ -8,21 +8,36 @@ from train_helpers import get_all_test_stats, train_model, eval_model
 from plot_helpers import plot_test_stats
 from torch.utils.tensorboard import SummaryWriter
 from parser import parse_arguments
-from utils import get_mse_per_folder, count_parameters
+from utils import get_mse_per_folder, get_model_details
 
 
 def main():
     args = parse_arguments()
-    log_folder = "runs"
 
-    batch_size = args.batch_size
-    max_epoch = args.max_epoch
-    patience = args.patience
-    test_every_n_epoch = args.test_every_n
+    # generate exp log file
+    log_dir = "runs"
+    os.makedirs("runs", exist_ok=True)
+    exp_no = 1
+    while f"exp{exp_no}" in os.listdir(log_dir):
+        exp_no += 1
 
-    exp_name = f"{args.model_name}_ep-{max_epoch}_bs-{batch_size}_pt-{patience}"
-    writer = SummaryWriter(os.path.join(log_folder, exp_name))
+    writer = SummaryWriter(os.path.join(log_dir, f"exp{exp_no}"))
 
+    params_dict = {
+        "bsize": args.batch_size,
+        "max_epoch": args.max_epoch,
+        "patience": args.patience,
+        "test_every_n_epoch": args.test_every_n,
+        "train_set_name": args.train_set,
+        "val_set_name": args.val_set,
+        "test_set_name": args.test_set,
+        "lr": args.lr,
+        "cuda": args.cuda
+    }
+
+    device = f"cuda:{params_dict['cuda']}"
+
+    # Transformer Params
     model_dim = 128  # transformer linear projection dim
     n_head = 4
     patch_dim = 40  # patch embedding dim
@@ -30,58 +45,59 @@ def main():
     dropout = 0.1
     token_embedding_dim = 168
 
-    device = "cuda:0"
     parent_dir = os.path.dirname(os.getcwd())
 
     # train and val set folders
-    train_data_dir = os.path.join(parent_dir, "datasets", "train")
-    val_data_dir = os.path.join(parent_dir, "datasets", "val")
+    train_data_dir = os.path.join(parent_dir, "datasets", params_dict["train_set_name"])
+    val_data_dir = os.path.join(parent_dir, "datasets", params_dict["val_set_name"])
 
     # test set folders
-    ds_test_data_dir = os.path.join(parent_dir, "datasets", "test", "DS_test_set")
-    mds_test_data_dir = os.path.join(parent_dir, "datasets", "test", "MDS_test_set")
-    snr_test_data_dir = os.path.join(parent_dir, "datasets", "test", "SNR_test_set")
+    ds_test_data_dir = os.path.join(parent_dir, "datasets", params_dict["test_set_name"], "DS_test_set")
+    mds_test_data_dir = os.path.join(parent_dir, "datasets", params_dict["test_set_name"], "MDS_test_set")
+    snr_test_data_dir = os.path.join(parent_dir, "datasets", params_dict["test_set_name"], "SNR_test_set")
 
     # train dataloader
     train_dataset = MatDataset(train_data_dir)
-    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=params_dict["bsize"], shuffle=True)
 
     # val dataloader
     val_dataset = MatDataset(val_data_dir)
-    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=params_dict["bsize"], shuffle=True)
 
     # test dataloaders
-    ds_test_dataloaders = get_test_dataloaders(ds_test_data_dir, batch_size=batch_size)
-    mds_test_dataloaders = get_test_dataloaders(mds_test_data_dir, batch_size=batch_size)
-    snr_test_dataloaders = get_test_dataloaders(snr_test_data_dir, batch_size=batch_size)
+    ds_test_dataloaders = get_test_dataloaders(ds_test_data_dir, batch_size=params_dict["bsize"])
+    mds_test_dataloaders = get_test_dataloaders(mds_test_data_dir, batch_size=params_dict["bsize"])
+    snr_test_dataloaders = get_test_dataloaders(snr_test_data_dir, batch_size=params_dict["bsize"])
+
     test_dataloaders = {
         "DS": ds_test_dataloaders,
         "MDS": mds_test_dataloaders,
         "SNR": snr_test_dataloaders,
     }
 
-    cevit_model = CeViT(device, token_embedding_dim, input_dim, patch_dim, model_dim, n_head, dropout)
-    count_parameters(cevit_model)
-    early_stopper = EarlyStopping(patience)
-    optimizer = torch.optim.Adam(cevit_model.parameters(), lr=1e-3)
+    model = CeViT(device, token_embedding_dim, input_dim, patch_dim, model_dim, n_head, dropout)
+    num_total_params, model_summary = get_model_details(model)
+    writer.add_text("Number of Parameters", str(num_total_params))
+    early_stopper = EarlyStopping(params_dict["patience"])
+    optimizer = torch.optim.Adam(model.parameters(), lr=params_dict["lr"])
     scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.9954)
     loss = torch.nn.MSELoss()
 
-    for ep in range(max_epoch):
-        train_loss = train_model(cevit_model, optimizer, loss, scheduler, train_dataloader)
-        writer.add_scalar(tag='train loss',
+    for ep in range(params_dict["max_epoch"]):
+        train_loss = train_model(model, optimizer, loss, scheduler, train_dataloader)
+        writer.add_scalar(tag='Loss/Train',
                           scalar_value=train_loss,
                           global_step=ep + 1)
 
-        val_loss = eval_model(cevit_model, val_dataloader, loss)
-        writer.add_scalar(tag='val loss',
+        val_loss = eval_model(model, val_dataloader, loss)
+        writer.add_scalar(tag='Loss/Val',
                           scalar_value=val_loss,
                           global_step=ep + 1)
         if early_stopper.early_stop(val_loss):
             break
 
-        if (ep + 1) % test_every_n_epoch == 0:
-            ds_stats, mds_stats, snr_stats = get_all_test_stats(cevit_model, test_dataloaders, loss)
+        if (ep + 1) % params_dict["test_every_n_epoch"] == 0:
+            ds_stats, mds_stats, snr_stats = get_all_test_stats(model, test_dataloaders, loss)
 
             ds_ls_stats = get_mse_per_folder(ds_test_data_dir)
             mds_ls_stats = get_mse_per_folder(mds_test_data_dir)
@@ -102,6 +118,32 @@ def main():
                                   x_name="SNR (dB)",
                                   stats=[snr_stats, snr_ls_stats],
                                   methods=["CE-ViT", "LS"]))
+
+    try:
+        writer.add_hparams(
+            hparam_dict=params_dict,
+            metric_dict={"last_epoch": (ep + 1)},
+            run_name=".")
+    except NameError:
+        writer.add_text("Error", "Parameter dictionary could not be logged.")
+
+    try:
+        for (ds_val, snr_val, mds_val) in zip(ds_stats.keys(), snr_stats.keys(), mds_stats.keys()):
+            writer.add_scalars(
+                "Delay Spread",
+                {"LS": ds_ls_stats[ds_val],
+                 "CeViT": ds_stats[ds_val]}, ds_val)
+            writer.add_scalars(
+                "SNR",
+                {"LS": snr_ls_stats[snr_val],
+                 "CeViT": snr_stats[snr_val]}, snr_val)
+            writer.add_scalars(
+                "Doppler Shift",
+                {"LS": mds_ls_stats[mds_val],
+                 "CeViT": mds_stats[mds_val]}, mds_val)
+    except NameError:
+        writer.add_text("Error", "Test results could not be logged")
+
     writer.close()
 
 
