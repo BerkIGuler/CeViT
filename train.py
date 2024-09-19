@@ -102,6 +102,7 @@ def main():
                                   x_name="SNR (dB)",
                                   stats=[snr_stats, snr_ls_stats],
                                   methods=["CE-ViT", "LS"]))
+    writer.close()
 
 
 if __name__ == "__main__":
