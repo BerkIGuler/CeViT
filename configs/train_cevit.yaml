@@ -1,14 +1,13 @@
 # CeViT training config
-# Based on CE-ViT paper (GLOBECOM 2023): Nf=120, Nt=14, patch 10×4, dmodel=128, Nhead=4.
-# Paths aligned with CHAST dataset layout (NeoRadium TDL-A).
+# Based on CE-ViT paper Nf=120, Nt=14, patch 10×4, dmodel=128, Nhead=4.
 
 seed: 1337
 
 device: cuda:0
 
 paths:
-  data_path: opt/shared/datasets/NeoRadiumTDLdataset/train/TDLA/
-  out_dir: runs_cevit/
+  data_path: /opt/shared/datasets/NeoRadiumTDLdataset/train/TDLA/
+  out_dir: runs/tdla/
 
 split:
   val_split: 0.1
@@ -21,8 +20,10 @@ train:
 optim:
   lr: 0.001
   weight_decay: 1e-5
+  # Paper: "The learning rate exponentially decays every 500 epochs by a factor of 10"
   scheduler:
-    t_max_epochs: 1000
+    step_size: 500
+    gamma: 0.1
 
 early_stopping:
   patience: 100

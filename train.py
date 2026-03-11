@@ -45,7 +45,8 @@ DEFAULTS: Dict[str, Any] = {
         "lr": 1e-3,
         "weight_decay": 1e-5,
         "scheduler": {
-            "t_max_epochs": 300,
+            "step_size": 500,
+            "gamma": 0.1,
         },
     },
     "early_stopping": {
@@ -215,8 +216,10 @@ def main() -> None:
     lr = float(_cfg_get(cfg, "optim.lr", DEFAULTS["optim"]["lr"]))
     weight_decay = float(_cfg_get(cfg, "optim.weight_decay", DEFAULTS["optim"]["weight_decay"]))
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
-    t_max = int(_cfg_get(cfg, "optim.scheduler.t_max_epochs", DEFAULTS["optim"]["scheduler"]["t_max_epochs"]))
-    scheduler = torch.optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=t_max)
+    # Paper: "The learning rate exponentially decays every 500 epochs by a factor of 10"
+    step_size = int(_cfg_get(cfg, "optim.scheduler.step_size", DEFAULTS["optim"]["scheduler"]["step_size"]))
+    gamma = float(_cfg_get(cfg, "optim.scheduler.gamma", DEFAULTS["optim"]["scheduler"]["gamma"]))
+    scheduler = torch.optim.lr_scheduler.StepLR(optimizer, step_size=step_size, gamma=gamma)
 
     tb_writer = SummaryWriter(log_dir=str(out_dir_path / "tb"))
 
