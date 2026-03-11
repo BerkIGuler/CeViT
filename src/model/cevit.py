@@ -1,31 +1,43 @@
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class CeViT(nn.Module):
     """
     CE-ViT: Channel Estimator Vision Transformer (paper Section III.A).
-    Expects LS at pilots as (B, num_pilot_subcarriers, num_pilot_symbols) e.g. (B, 60, 3),
-    or full grid (B, Nf, Nt) e.g. (B, 120, 14). Output is (B, Nf, Nt) complex.
+    Input: dense (interpolated) channel grid (B, Nf, Nt) e.g. (B, 120, 14) complex.
+    Output: (B, Nf, Nt) complex.
+
+    meta_data: dict from TDLDataset with keys "SNR", "delay_spread", "doppler_shift"
+    (tensors, any shape; model will float() and unsqueeze(1) for tokenizer).
     """
-    def __init__(self, device, token_emb_dim, input_dim, patch_dim, model_dim, n_head, dropout,
-                 num_subcarriers=120, num_symbols=14, pilot_grid_shape=(60, 3)):
+    def __init__(
+        self,
+        device,
+        token_emb_dim,
+        input_dim,
+        patch_dim,
+        model_dim,
+        n_head,
+        dropout,
+        num_subcarriers=120,
+        num_symbols=14,
+        patch_size=(10, 4),
+        activation="gelu",
+    ):
         super(CeViT, self).__init__()
         self.device = device
         self.num_subcarriers = num_subcarriers
         self.num_symbols = num_symbols
-        self.pilot_grid_shape = pilot_grid_shape  # (H_pilot, W_pilot) when input is pilot-only
+        self.patch_size = tuple(patch_size)
 
-        self.upsampling = UpsamplingModule(
-            num_subcarriers=num_subcarriers,
-            num_symbols=num_symbols,
-            pilot_grid_shape=pilot_grid_shape,
-        ).to(device)
-        self.patcher = PatchEmbedding().to(device)
+        num_patches = (num_subcarriers * (2 * num_symbols)) // (self.patch_size[0] * self.patch_size[1])
+
+        self.real_imag_concat = RealImagConcat().to(device)
+        self.patcher = PatchEmbedding(patch_size=self.patch_size).to(device)
         self.inverse_patcher = InversePatchEmbedding(
             output_size=(num_subcarriers, 2 * num_symbols),
-            patch_size=(10, 4),
+            patch_size=self.patch_size,
         ).to(device)
         self.tokenizer = TokenModule(input_size=1, embedding_dim=token_emb_dim).to(device)
         self.encoder = Encoder(
@@ -33,8 +45,8 @@ class CeViT(nn.Module):
             output_dim=patch_dim,
             d_model=model_dim,
             nhead=n_head,
-            num_patches=(num_subcarriers * (2 * num_symbols)) // (10 * 4),  # 84 for 120×28
-            activation="gelu",
+            num_patches=num_patches,
+            activation=activation,
             dropout=dropout,
         ).to(device)
 
@@ -42,13 +54,14 @@ class CeViT(nn.Module):
         ls_channel, ideal_channel, meta_data = x
         ls_channel = ls_channel.to(self.device)
         ideal_channel = ideal_channel.to(self.device)
-        _, snr, delay_spread, max_dop_shift, _, _ = meta_data
-        snr = snr.to(self.device)
-        delay_spread = delay_spread.to(self.device)
-        max_dop_shift = max_dop_shift.to(self.device)
 
-        # Paper: f_int(LS at pilots) then real/imag concat → R^{Nf×2Nt}
-        real_2d = self.upsampling(ls_channel)  # (B, Nf, 2*Nt)
+        # meta_data: dict from TDLDataset with keys "SNR", "delay_spread", "doppler_shift"
+        snr = meta_data["SNR"].to(self.device).float().unsqueeze(1)
+        delay_spread = meta_data["delay_spread"].to(self.device).float().unsqueeze(1)
+        max_dop_shift = meta_data["doppler_shift"].to(self.device).float().unsqueeze(1)
+
+        # Input is already dense (120×14); paper: real/imag concat → R^{Nf×2Nt}
+        real_2d = self.real_imag_concat(ls_channel)  # (B, Nf, 2*Nt)
         ls_channel = self.patcher(real_2d)
         token_encodings = self.tokenizer(snr, delay_spread, max_dop_shift)
         model_input = torch.cat(tensors=(ls_channel, token_encodings), dim=2)
@@ -61,37 +74,15 @@ class CeViT(nn.Module):
         return estimated_channel, ideal_channel
 
 
-class UpsamplingModule(nn.Module):
+class RealImagConcat(nn.Module):
     """
-    Paper: bilinear interpolation of LS at pilots to full Nf×Nt, then concatenate
-    real and imaginary along time → R^{Nf×2Nt}.
-    Supports: (B, H_pilot, W_pilot) complex e.g. (B, 60, 3) or (B, Nf, Nt) complex e.g. (B, 120, 14).
+    Concatenate real and imaginary parts along the last dimension.
+    Input: (B, Nf, Nt) complex. Output: (B, Nf, 2*Nt) real.
+    (Upsampling/interpolation is done in the dataset; input is already dense.)
     """
-    def __init__(self, num_subcarriers=120, num_symbols=14, pilot_grid_shape=(60, 3)):
-        super().__init__()
-        self.num_subcarriers = num_subcarriers
-        self.num_symbols = num_symbols
-        self.pilot_grid_shape = pilot_grid_shape
 
-    def forward(self, ls_channel):
-        # ls_channel: (B, ..., ) complex
-        if ls_channel.shape[-2:] == self.pilot_grid_shape:
-            # Pilot-only: (B, H_p, W_p) → interpolate to (B, Nf, Nt) then real concat
-            re_im = torch.stack([ls_channel.real, ls_channel.imag], dim=1)  # (B, 2, H_p, W_p)
-            re_im = F.interpolate(
-                re_im,
-                size=(self.num_subcarriers, self.num_symbols),
-                mode="bilinear",
-                align_corners=False,
-            )
-            real_part = re_im[:, 0]   # (B, Nf, Nt)
-            imag_part = re_im[:, 1]
-            return torch.cat([real_part, imag_part], dim=-1)  # (B, Nf, 2*Nt)
-        else:
-            # Full grid (B, Nf, Nt) complex → concat real and imag along time
-            real_part = ls_channel.real
-            imag_part = ls_channel.imag
-            return torch.cat([real_part, imag_part], dim=-1)  # (B, Nf, 2*Nt)
+    def forward(self, x):
+        return torch.cat([x.real, x.imag], dim=-1)
 
 
 class Encoder(nn.Module):

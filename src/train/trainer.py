@@ -67,26 +67,15 @@ class Trainer:
     def _batch_to_model_input(
         batch: Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]],
         device: torch.device,
-    ) -> Tuple[torch.Tensor, torch.Tensor, Tuple[Any, ...]]:
+    ) -> Tuple[torch.Tensor, torch.Tensor, Dict[str, torch.Tensor]]:
         """
-        Convert a TDLDataset batch to CeViT model input.
-
-        Batch elements:
-            ls_channel: LS estimate at pilots or sparse grid, complex tensor
-            h_true: true channel, complex tensor
-            stats: dict with keys including "SNR", "delay_spread", "doppler_shift"
+        Move TDLDataset batch to device. CeViT expects meta_data as a dict with
+        keys "SNR", "delay_spread", "doppler_shift" (dataset-compliant).
         """
         ls_channel, h_true, stats = batch
-
-        # Stats come collated as tensors by the default DataLoader collate_fn.
-        snr = stats["SNR"].to(device).float().unsqueeze(1)
-        delay_spread = stats["delay_spread"].to(device).float().unsqueeze(1)
-        max_dop_shift = stats["doppler_shift"].to(device).float().unsqueeze(1)
-
-        meta = (None, snr, delay_spread, max_dop_shift, None, None)
-
         ls_channel = ls_channel.to(device)
         h_true = h_true.to(device)
+        meta = {k: v.to(device) for k, v in stats.items()}
         return ls_channel, h_true, meta
 
     @staticmethod

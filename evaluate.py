@@ -58,9 +58,6 @@ def main() -> None:
     else:
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-    num_pilot_subcarriers = args.num_subcarriers // args.pilot_every_n
-    pilot_grid_shape = (num_pilot_subcarriers, len(args.pilot_symbols))
-
     model = CeViT(
         device=device,
         token_emb_dim=168,
@@ -71,7 +68,8 @@ def main() -> None:
         dropout=0.1,
         num_subcarriers=args.num_subcarriers,
         num_symbols=args.num_symbols,
-        pilot_grid_shape=pilot_grid_shape,
+        patch_size=(10, 4),
+        activation="gelu",
     ).to(device)
 
     ckpt = Trainer.load_checkpoint(args.checkpoint, model=model, map_location=device)
@@ -104,13 +102,9 @@ def main() -> None:
 
             for batch in loader:
                 ls_channel, h_true, stats = batch
-                snr_t = stats["SNR"].to(device).float().unsqueeze(1)
-                delay_spread = stats["delay_spread"].to(device).float().unsqueeze(1)
-                max_dop_shift = stats["doppler_shift"].to(device).float().unsqueeze(1)
-                meta = (None, snr_t, delay_spread, max_dop_shift, None, None)
-
                 ls_channel = ls_channel.to(device)
                 h_true = h_true.to(device)
+                meta = {k: v.to(device) for k, v in stats.items()}
 
                 est_channel, ideal_channel = model((ls_channel, h_true, meta))
 

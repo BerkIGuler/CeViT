@@ -19,7 +19,7 @@ train:
 
 optim:
   lr: 0.001
-  weight_decay: 1e-5
+  weight_decay: 0.0
   # Paper: "The learning rate exponentially decays every 500 epochs by a factor of 10"
   scheduler:
     step_size: 500
@@ -38,8 +38,10 @@ dataset:
 
 model:
   # Paper: tokens of size R^{Nf*Nt/10} reshaped to R^{Nf*Nt/20 × 2} per scalar → 6 dims total; input R^{Nf*Nt/20 × 46}
-  token_emb_dim: 168
-  patch_dim: 40
+  token_emb_dim: 168  # Nf x Nt / 10 = 120 x 14 / 10 = 168
+  patch_dim: 40  # patch_size[0] x patch_size[1]
   model_dim: 128
   num_heads: 4
-  dropout: 0.1
+  dropout: 0.0  # Paper does not mention dropout
+  patch_size: [10, 4]  # (height, width) per patch
+  activation: "gelu"

@@ -40,6 +40,8 @@ DEFAULTS: Dict[str, Any] = {
         "model_dim": 128,
         "num_heads": 4,
         "dropout": 0.1,
+        "patch_size": [10, 4],
+        "activation": "gelu",
     },
     "optim": {
         "lr": 1e-3,
@@ -194,10 +196,8 @@ def main() -> None:
     dropout = float(_cfg_get(cfg, "model.dropout", DEFAULTS["model"]["dropout"]))
 
     input_dim = patch_dim + 6
-    pilot_symbols_list = list(_cfg_get(cfg, "dataset.pilot_symbols", DEFAULTS["dataset"]["pilot_symbols"]))
-    pilot_every_n = int(_cfg_get(cfg, "dataset.pilot_every_n", DEFAULTS["dataset"]["pilot_every_n"]))
-    num_pilot_subcarriers = num_subcarriers // pilot_every_n
-    pilot_grid_shape = (num_pilot_subcarriers, len(pilot_symbols_list))
+    patch_size = tuple(_cfg_get(cfg, "model.patch_size", DEFAULTS["model"]["patch_size"]))
+    activation = str(_cfg_get(cfg, "model.activation", DEFAULTS["model"]["activation"]))
 
     model = CeViT(
         device=device,
@@ -209,7 +209,8 @@ def main() -> None:
         dropout=dropout,
         num_subcarriers=num_subcarriers,
         num_symbols=num_symbols,
-        pilot_grid_shape=pilot_grid_shape,
+        patch_size=patch_size,
+        activation=activation,
     ).to(device)
 
     epochs = int(_cfg_get(cfg, "train.epochs", DEFAULTS["train"]["epochs"]))
