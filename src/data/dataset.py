@@ -5,6 +5,59 @@ from pathlib import Path
 import random
 
 
+class BilinearInterpolation:
+    """
+    Bilinear interpolation of LS channel estimates on a regular pilot grid.
+    Pilots sit on even subcarriers (0, 2, …, 118). Pilot OFDM symbols can be
+    at any subset of symbol indices (e.g. [2], [2, 3], or [2, 7, 11]).
+    1) Linear interpolation across subcarriers (frequency).
+    2) Piecewise linear interpolation / extrapolation across symbols (time).
+    """
+
+    def __init__(self):
+        pass
+
+    def __call__(self, hp_ls):
+        hp_ls = hp_ls.clone() if hasattr(hp_ls, "clone") else np.asarray(hp_ls, dtype=np.complex128).copy()
+        pilot_syms = np.where(hp_ls[0, :].real != 0)[0]
+
+        # Frequency: average even-indexed neighbours to fill odd subcarrier rows
+        hp_ls[1:-1:2, pilot_syms] = (hp_ls[:-2:2, pilot_syms] + hp_ls[2::2, pilot_syms]) / 2
+        hp_ls[-1, pilot_syms] = hp_ls[-2, pilot_syms]
+
+        # Time: nearest-neighbour or piecewise linear interpolation / extrapolation
+        if len(pilot_syms) == 1:
+            hp_ls[:] = hp_ls[:, pilot_syms[0] : pilot_syms[0] + 1]
+        elif len(pilot_syms) == 2:
+            p0, p1 = int(pilot_syms[0]), int(pilot_syms[1])
+            if p1 - p0 == 1:
+                mid = (p0 + p1) / 2.0
+                for i in range(hp_ls.shape[1]):
+                    if i <= mid:
+                        hp_ls[:, i] = hp_ls[:, p0]
+                    else:
+                        hp_ls[:, i] = hp_ls[:, p1]
+            else:
+                slope = (hp_ls[:, p1] - hp_ls[:, p0]) / (p1 - p0)
+                for i in range(hp_ls.shape[1]):
+                    if i not in (p0, p1):
+                        hp_ls[:, i] = hp_ls[:, p0] + slope * (i - p0)
+        elif len(pilot_syms) == 3:
+            p0, p1, p2 = int(pilot_syms[0]), int(pilot_syms[1]), int(pilot_syms[2])
+            slope_1 = (hp_ls[:, p1] - hp_ls[:, p0]) / (p1 - p0)
+            slope_2 = (hp_ls[:, p2] - hp_ls[:, p1]) / (p2 - p1)
+            for i in range(hp_ls.shape[1]):
+                if i < p0:
+                    hp_ls[:, i] = hp_ls[:, p0] + slope_1 * (i - p0)
+                elif p0 < i < p1:
+                    hp_ls[:, i] = hp_ls[:, p0] + slope_1 * (i - p0)
+                elif p1 < i < p2:
+                    hp_ls[:, i] = hp_ls[:, p1] + slope_2 * (i - p1)
+                elif i > p2:
+                    hp_ls[:, i] = hp_ls[:, p2] + slope_2 * (i - p2)
+        return hp_ls
+
+
 class TDLDataset(Dataset):
     def __init__(
         self, data_path, *, normalization_stats=None,return_pilots_only=True, num_subcarriers=120,
@@ -55,6 +108,8 @@ class TDLDataset(Dataset):
         self.num_pilot_symbols = len(self.pilot_symbols)
         self.num_pilot_subcarriers = int(self.pilot_mask.sum()) // self.num_pilot_symbols
 
+        self.bilinear_interp = BilinearInterpolation()
+
     def __len__(self):
         return len(self.index)
 
@@ -68,9 +123,13 @@ class TDLDataset(Dataset):
         stats = self.stats[file_path].copy()
         stats["SNR"] = SNR
 
-        LS_channel_at_pilots_torch = torch.from_numpy(LS_channel_at_pilots).to(torch.complex64)
+        if not self.return_pilots_only:
+            # Sparse 120×14: fill via bilinear interpolation so CeViT gets full grid
+            LS_channel_at_pilots = self.bilinear_interp(LS_channel_at_pilots)
+
+        LS_channel_torch = torch.from_numpy(LS_channel_at_pilots).to(torch.complex64)
         channel_torch = torch.from_numpy(channel).to(torch.complex64)
-        return LS_channel_at_pilots_torch, channel_torch, stats
+        return LS_channel_torch, channel_torch, stats
     
     @staticmethod
     def _load_data_from_folder(file_list, normalization_stats=None):

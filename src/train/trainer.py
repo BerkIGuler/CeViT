@@ -1,0 +1,231 @@
+from __future__ import annotations
+
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, Optional, Tuple, Union
+
+import torch
+import torch.nn as nn
+from torch.utils.data import DataLoader
+
+
+@dataclass(frozen=True)
+class EarlyStoppingConfig:
+    patience: int = 50
+    min_delta: float = 1e-5
+
+
+@dataclass(frozen=True)
+class CheckpointConfig:
+    out_dir: Path
+    filename: str = "best.pt"
+
+    @property
+    def path(self) -> Path:
+        return self.out_dir / self.filename
+
+
+class Trainer:
+    """
+    Generic trainer for CeViT that mirrors the CHAST trainer structure.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: nn.Module,
+        device: torch.device,
+        optimizer: torch.optim.Optimizer,
+        scheduler: Optional[torch.optim.lr_scheduler._LRScheduler],
+        train_loader: DataLoader,
+        val_loader: DataLoader,
+        checkpoint: CheckpointConfig,
+        early_stopping: EarlyStoppingConfig = EarlyStoppingConfig(),
+        run_config: Optional[Dict[str, Any]] = None,
+        tb_writer: Optional["SummaryWriter"] = None,
+    ) -> None:
+        self.model = model
+        self.device = device
+        self.optimizer = optimizer
+        self.scheduler = scheduler
+        self.train_loader = train_loader
+        self.val_loader = val_loader
+        self.checkpoint = checkpoint
+        self.early_stopping = early_stopping
+        self.run_config = run_config
+        self.tb_writer = tb_writer
+
+        self.criterion = nn.MSELoss()
+
+        self.best_val_nmse_db = float("inf")
+        self.best_epoch = -1
+        self._no_improve = 0
+
+        self.checkpoint.out_dir.mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def _batch_to_model_input(
+        batch: Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]],
+        device: torch.device,
+    ) -> Tuple[torch.Tensor, torch.Tensor, Tuple[Any, ...]]:
+        """
+        Convert a TDLDataset batch to CeViT model input.
+
+        Batch elements:
+            ls_channel: LS estimate at pilots or sparse grid, complex tensor
+            h_true: true channel, complex tensor
+            stats: dict with keys including "SNR", "delay_spread", "doppler_shift"
+        """
+        ls_channel, h_true, stats = batch
+
+        # Stats come collated as tensors by the default DataLoader collate_fn.
+        snr = stats["SNR"].to(device).float().unsqueeze(1)
+        delay_spread = stats["delay_spread"].to(device).float().unsqueeze(1)
+        max_dop_shift = stats["doppler_shift"].to(device).float().unsqueeze(1)
+
+        meta = (None, snr, delay_spread, max_dop_shift, None, None)
+
+        ls_channel = ls_channel.to(device)
+        h_true = h_true.to(device)
+        return ls_channel, h_true, meta
+
+    @staticmethod
+    def _nmse_sums(
+        pred: torch.Tensor, target: torch.Tensor
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        """
+        Return (sum_num, sum_den) across batch for NMSE:
+            sum_num = Σ ||pred - target||^2
+            sum_den = Σ ||target||^2
+        """
+        err = pred - target
+        dims = tuple(range(1, pred.ndim))
+        num = (err * err.conj()).abs().sum(dim=dims)
+        den = (target * target.conj()).abs().sum(dim=dims)
+        return num.sum(), den.sum()
+
+    def train(self, *, epochs: int) -> Dict[str, Any]:
+        for epoch in range(1, epochs + 1):
+            train_loss = self._train_one_epoch()
+            val_nmse_db = self._validate()
+
+            if self.scheduler is not None:
+                self.scheduler.step()
+
+            improved = (self.best_val_nmse_db - val_nmse_db) > self.early_stopping.min_delta
+            if improved:
+                self.best_val_nmse_db = val_nmse_db
+                self.best_epoch = epoch
+                self._no_improve = 0
+                self._save_checkpoint(epoch=epoch, val_nmse_db=val_nmse_db)
+            else:
+                self._no_improve += 1
+
+            lr = self.optimizer.param_groups[0].get("lr", None)
+            lr_str = f"{lr:.3e}" if isinstance(lr, float) else str(lr)
+            print(
+                f"epoch {epoch:03d} | train_mse={train_loss:.6e} | val_nmse_db={val_nmse_db:.3f} | best={self.best_val_nmse_db:.3f} @ {self.best_epoch:03d} | lr={lr_str}"
+            )
+
+            if self.tb_writer is not None:
+                self.tb_writer.add_scalar("loss/train_mse", train_loss, epoch)
+                self.tb_writer.add_scalar("nmse/val_db", val_nmse_db, epoch)
+                if isinstance(lr, float):
+                    self.tb_writer.add_scalar("optim/lr", lr, epoch)
+
+            if self._no_improve >= self.early_stopping.patience:
+                print(
+                    f"early stopping: no improvement for {self.early_stopping.patience} epochs (min_delta={self.early_stopping.min_delta})"
+                )
+                break
+
+        return {
+            "best_val_nmse_db": self.best_val_nmse_db,
+            "best_epoch": self.best_epoch,
+            "best_checkpoint_path": str(self.checkpoint.path),
+        }
+
+    def _train_one_epoch(self) -> float:
+        from tqdm.auto import tqdm
+
+        self.model.train()
+        total_weighted_loss = 0.0
+        total_samples = 0
+
+        pbar = tqdm(self.train_loader, desc="train", leave=False)
+        for batch in pbar:
+            ls_channel, h_true, meta = self._batch_to_model_input(batch, self.device)
+            batch_size = ls_channel.size(0)
+
+            self.optimizer.zero_grad(set_to_none=True)
+
+            est_channel, ideal_channel = self.model((ls_channel, h_true, meta))
+            # MSE for complex: E[|est - ideal|^2]
+            loss = (est_channel - ideal_channel).abs().pow(2).mean()
+
+            loss.backward()
+            self.optimizer.step()
+
+            total_weighted_loss += float(loss.detach().cpu()) * batch_size
+            total_samples += batch_size
+            pbar.set_postfix(mse=float(loss.detach().cpu()))
+
+        return total_weighted_loss / max(total_samples, 1)
+
+    @torch.no_grad()
+    def _validate(self) -> float:
+        from tqdm.auto import tqdm
+
+        self.model.eval()
+
+        num_sum = torch.tensor(0.0, device=self.device)
+        den_sum = torch.tensor(0.0, device=self.device)
+
+        pbar = tqdm(self.val_loader, desc="val", leave=False)
+        for batch in pbar:
+            ls_channel, h_true, meta = self._batch_to_model_input(batch, self.device)
+            est_channel, ideal_channel = self.model((ls_channel, h_true, meta))
+            bnum, bden = self._nmse_sums(est_channel, ideal_channel)
+            num_sum += bnum
+            den_sum += bden
+            nmse = num_sum / den_sum
+            pbar.set_postfix(nmse_db=float((10.0 * torch.log10(nmse)).detach().cpu()))
+
+        nmse = num_sum / den_sum
+        nmse_db = 10.0 * torch.log10(nmse)
+        return float(nmse_db.detach().cpu())
+
+    def _save_checkpoint(self, *, epoch: int, val_nmse_db: float) -> None:
+        payload = {
+            "epoch": epoch,
+            "val_nmse_db": val_nmse_db,
+            "config": self.run_config,
+            "model_state_dict": self.model.state_dict(),
+            "optimizer_state_dict": self.optimizer.state_dict(),
+            "scheduler_state_dict": self.scheduler.state_dict() if self.scheduler is not None else None,
+        }
+        torch.save(payload, self.checkpoint.path)
+
+    @staticmethod
+    def load_checkpoint(
+        path: Union[str, Path],
+        *,
+        model: nn.Module,
+        optimizer: Optional[torch.optim.Optimizer] = None,
+        scheduler: Optional[torch.optim.lr_scheduler._LRScheduler] = None,
+        map_location: Union[str, torch.device] = "cpu",
+    ) -> Dict[str, Any]:
+        ckpt = torch.load(str(path), map_location=map_location)
+        model.load_state_dict(ckpt["model_state_dict"])
+        if optimizer is not None and ckpt.get("optimizer_state_dict") is not None:
+            optimizer.load_state_dict(ckpt["optimizer_state_dict"])
+        if scheduler is not None and ckpt.get("scheduler_state_dict") is not None:
+            scheduler.load_state_dict(ckpt["scheduler_state_dict"])
+        return ckpt
+
+
+try:  # optional tensorboard dependency, same pattern as CHAST
+    from torch.utils.tensorboard import SummaryWriter  # noqa: E402
+except Exception:  # pragma: no cover
+    SummaryWriter = None  # type: ignore[assignment]
+
