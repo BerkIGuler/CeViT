@@ -71,6 +71,18 @@ def _build_argparser() -> argparse.ArgumentParser:
         default=None,
         help="Override device from config (e.g., cpu or cuda:0). If not set, config or auto is used.",
     )
+    p.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Override random seed from config.",
+    )
+    p.add_argument(
+        "--out_dir",
+        type=str,
+        default=None,
+        help="Override `paths.out_dir` from config (e.g. runs/exp2/tdla_2).",
+    )
     return p
 
 
@@ -107,7 +119,7 @@ def main() -> None:
 
     cfg = _load_yaml(args.config)
 
-    seed = int(_cfg_get(cfg, "seed", DEFAULTS["seed"]))
+    seed = int(args.seed) if args.seed is not None else int(_cfg_get(cfg, "seed", DEFAULTS["seed"]))
     _set_seed(seed)
 
     cfg_device = _cfg_get(cfg, "device", None)
@@ -129,7 +141,7 @@ def main() -> None:
     data_path = _cfg_get(cfg, "paths.data_path")
     if not data_path:
         raise ValueError("Missing `paths.data_path` in config.")
-    out_dir = str(_cfg_get(cfg, "paths.out_dir", DEFAULTS["paths"]["out_dir"]))
+    out_dir = str(args.out_dir) if args.out_dir is not None else str(_cfg_get(cfg, "paths.out_dir", DEFAULTS["paths"]["out_dir"]))
     out_dir_path = Path(out_dir)
     out_dir_path.mkdir(parents=True, exist_ok=True)
 
