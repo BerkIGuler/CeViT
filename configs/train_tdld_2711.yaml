@@ -1,0 +1,47 @@
+# CeViT training config
+# Based on CE-ViT paper Nf=120, Nt=14, patch 10×4, dmodel=128, Nhead=4.
+
+seed: 1337
+
+device: cuda:0
+
+paths:
+  data_path: /opt/shared/datasets/NeoRadiumTDLdataset/train/TDLD/
+  out_dir: runs/tdld/
+
+split:
+  val_split: 0.1
+
+train:
+  epochs: 1000
+  batch_size: 512
+  num_workers: 4
+
+optim:
+  lr: 0.001
+  weight_decay: 0.0
+  # Paper: "The learning rate exponentially decays every 500 epochs by a factor of 10"
+  scheduler:
+    step_size: 500
+    gamma: 0.1
+
+early_stopping:
+  patience: 100
+  min_delta: 1e-5
+
+dataset:
+  num_subcarriers: 120
+  num_symbols: 14
+  pilot_symbols: [2, 7, 11]
+  pilot_every_n: 2
+  snrs: [0, 5, 10, 15, 20, 25, 30]
+
+model:
+  # Paper: tokens of size R^{Nf*Nt/10} reshaped to R^{Nf*Nt/20 × 2} per scalar → 6 dims total; input R^{Nf*Nt/20 × 46}
+  token_emb_dim: 168  # Nf x Nt / 10 = 120 x 14 / 10 = 168
+  patch_dim: 40  # patch_size[0] x patch_size[1]
+  model_dim: 128
+  num_heads: 4
+  dropout: 0.0  # Paper does not mention dropout
+  patch_size: [10, 4]  # (height, width) per patch
+  activation: "gelu"
