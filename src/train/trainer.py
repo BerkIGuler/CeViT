@@ -148,9 +148,9 @@ class Trainer:
 
             self.optimizer.zero_grad(set_to_none=True)
 
-            est_channel, ideal_channel = self.model((ls_channel, h_true, meta))
+            est_channel = self.model(ls_channel, meta)
             # MSE for complex: E[|est - ideal|^2]
-            loss = (est_channel - ideal_channel).abs().pow(2).mean()
+            loss = (est_channel - h_true).abs().pow(2).mean()
 
             loss.backward()
             self.optimizer.step()
@@ -173,8 +173,8 @@ class Trainer:
         pbar = tqdm(self.val_loader, desc="val", leave=False)
         for batch in pbar:
             ls_channel, h_true, meta = self._batch_to_model_input(batch, self.device)
-            est_channel, ideal_channel = self.model((ls_channel, h_true, meta))
-            bnum, bden = self._nmse_sums(est_channel, ideal_channel)
+            est_channel = self.model(ls_channel, meta)
+            bnum, bden = self._nmse_sums(est_channel, h_true)
             num_sum += bnum
             den_sum += bden
             nmse = num_sum / den_sum

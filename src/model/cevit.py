@@ -5,11 +5,11 @@ import torch.nn as nn
 class CeViT(nn.Module):
     """
     CE-ViT: Channel Estimator Vision Transformer (paper Section III.A).
-    Input: dense (interpolated) channel grid (B, Nf, Nt) e.g. (B, 120, 14) complex.
-    Output: (B, Nf, Nt) complex.
 
-    meta_data: dict from TDLDataset with keys "SNR", "delay_spread", "doppler_shift"
-    (tensors, any shape; model will float() and unsqueeze(1) for tokenizer).
+    forward(ls_channel, meta_data) -> estimated_channel
+    - ls_channel: dense (interpolated) grid (B, Nf, Nt) complex.
+    - meta_data: dict from TDLDataset with keys "SNR", "delay_spread", "doppler_shift".
+    - estimated_channel: (B, Nf, Nt) complex.
     """
     def __init__(
         self,
@@ -50,10 +50,8 @@ class CeViT(nn.Module):
             dropout=dropout,
         ).to(device)
 
-    def forward(self, x):
-        ls_channel, ideal_channel, meta_data = x
+    def forward(self, ls_channel, meta_data):
         ls_channel = ls_channel.to(self.device)
-        ideal_channel = ideal_channel.to(self.device)
 
         # meta_data: dict from TDLDataset with keys "SNR", "delay_spread", "doppler_shift"
         snr = meta_data["SNR"].to(self.device).float().unsqueeze(1)
@@ -71,7 +69,7 @@ class CeViT(nn.Module):
         # Paper: "splicing together the real and imaginary parts" → H in C^{Nf×Nt}
         half = real_out.size(-1) // 2
         estimated_channel = real_out[..., :half] + 1j * real_out[..., half:]
-        return estimated_channel, ideal_channel
+        return estimated_channel
 
 
 class RealImagConcat(nn.Module):

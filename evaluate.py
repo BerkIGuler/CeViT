@@ -106,11 +106,11 @@ def main() -> None:
                 h_true = h_true.to(device)
                 meta = {k: v.to(device) for k, v in stats.items()}
 
-                est_channel, ideal_channel = model((ls_channel, h_true, meta))
+                est_channel = model(ls_channel, meta)
 
-                err = est_channel - ideal_channel
+                err = est_channel - h_true
                 num_sum += (err * err.conj()).abs().sum()
-                den_sum += (ideal_channel * ideal_channel.conj()).abs().sum()
+                den_sum += (h_true * h_true.conj()).abs().sum()
 
             nmse = num_sum / den_sum
             nmse_db = 10.0 * torch.log10(nmse)
