@@ -65,7 +65,7 @@ def main() -> None:
         patch_dim=40,
         model_dim=128,
         n_head=4,
-        dropout=0.1,
+        dropout=0.0,
         num_subcarriers=args.num_subcarriers,
         num_symbols=args.num_symbols,
         patch_size=(10, 4),
@@ -83,9 +83,9 @@ def main() -> None:
     for snr in args.snrs:
         print(f"=== SNR = {snr} dB ===")
         results[int(snr)] = {}
-        for folder_name, dataset in get_in_distribution_test_datasets(
+        for folder_name, dataset in         get_in_distribution_test_datasets(
             Path(args.data_path),
-            return_pilots_only=True,
+            return_pilots_only=False,
             SNRs=[snr],
             pilot_symbols=args.pilot_symbols,
         ):

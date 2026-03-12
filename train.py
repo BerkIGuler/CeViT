@@ -215,8 +215,7 @@ def main() -> None:
 
     epochs = int(_cfg_get(cfg, "train.epochs", DEFAULTS["train"]["epochs"]))
     lr = float(_cfg_get(cfg, "optim.lr", DEFAULTS["optim"]["lr"]))
-    weight_decay = float(_cfg_get(cfg, "optim.weight_decay", DEFAULTS["optim"]["weight_decay"]))
-    optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=weight_decay)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     # Paper: "The learning rate exponentially decays every 500 epochs by a factor of 10"
     step_size = int(_cfg_get(cfg, "optim.scheduler.step_size", DEFAULTS["optim"]["scheduler"]["step_size"]))
     gamma = float(_cfg_get(cfg, "optim.scheduler.gamma", DEFAULTS["optim"]["scheduler"]["gamma"]))
