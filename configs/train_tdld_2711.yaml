@@ -7,7 +7,7 @@ device: cuda:0
 
 paths:
   data_path: /opt/shared/datasets/NeoRadiumTDLdataset/train/TDLD/
-  out_dir: runs/tdld/
+  out_dir: runs/tdld_2711/
 
 split:
   val_split: 0.1
