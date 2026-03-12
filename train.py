@@ -17,14 +17,14 @@ from src.train import CheckpointConfig, EarlyStoppingConfig, Trainer
 DEFAULTS: Dict[str, Any] = {
     "seed": 1337,
     "paths": {
-        "out_dir": "runs_cevit",
+        "out_dir": "runs",
     },
     "split": {
         "val_split": 0.1,
     },
     "train": {
-        "epochs": 300,
-        "batch_size": 64,
+        "epochs": 1000,
+        "batch_size": 512,
         "num_workers": 4,
     },
     "dataset": {
@@ -35,24 +35,24 @@ DEFAULTS: Dict[str, Any] = {
         "snrs": [0, 5, 10, 15, 20, 25, 30],
     },
     "model": {
-        "token_emb_dim": 24,
+        "token_emb_dim": 168,
         "patch_dim": 40,
         "model_dim": 128,
         "num_heads": 4,
-        "dropout": 0.1,
+        "dropout": 0.0,
         "patch_size": [10, 4],
         "activation": "gelu",
     },
     "optim": {
-        "lr": 1e-3,
-        "weight_decay": 1e-5,
+        "lr": 0.001,
+        "weight_decay": 0.0,
         "scheduler": {
             "step_size": 500,
             "gamma": 0.1,
         },
     },
     "early_stopping": {
-        "patience": 50,
+        "patience": 100,
         "min_delta": 1e-5,
     },
 }
@@ -148,7 +148,7 @@ def main() -> None:
     dataset = TDLDataset(
         data_path,
         normalization_stats=None,
-        return_pilots_only=True,
+        return_pilots_only=False,
         num_subcarriers=int(_cfg_get(cfg, "dataset.num_subcarriers", DEFAULTS["dataset"]["num_subcarriers"])),
         num_symbols=int(_cfg_get(cfg, "dataset.num_symbols", DEFAULTS["dataset"]["num_symbols"])),
         SNRs=list(_cfg_get(cfg, "dataset.snrs", DEFAULTS["dataset"]["snrs"])),

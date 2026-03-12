@@ -7,11 +7,17 @@ from typing import Any, Dict, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 from torch.utils.data import DataLoader
+from tqdm.auto import tqdm
+
+try:
+    from torch.utils.tensorboard import SummaryWriter
+except Exception:  # pragma: no cover
+    SummaryWriter = None  # type: ignore[assignment]
 
 
 @dataclass(frozen=True)
 class EarlyStoppingConfig:
-    patience: int = 50
+    patience: int = 100
     min_delta: float = 1e-5
 
 
@@ -27,7 +33,7 @@ class CheckpointConfig:
 
 class Trainer:
     """
-    Generic trainer for CeViT that mirrors the CHAST trainer structure.
+    Generic trainer for CeViT
     """
 
     def __init__(
@@ -135,8 +141,6 @@ class Trainer:
         }
 
     def _train_one_epoch(self) -> float:
-        from tqdm.auto import tqdm
-
         self.model.train()
         total_weighted_loss = 0.0
         total_samples = 0
@@ -163,8 +167,6 @@ class Trainer:
 
     @torch.no_grad()
     def _validate(self) -> float:
-        from tqdm.auto import tqdm
-
         self.model.eval()
 
         num_sum = torch.tensor(0.0, device=self.device)
@@ -211,10 +213,3 @@ class Trainer:
         if scheduler is not None and ckpt.get("scheduler_state_dict") is not None:
             scheduler.load_state_dict(ckpt["scheduler_state_dict"])
         return ckpt
-
-
-try:  # optional tensorboard dependency, same pattern as CHAST
-    from torch.utils.tensorboard import SummaryWriter  # noqa: E402
-except Exception:  # pragma: no cover
-    SummaryWriter = None  # type: ignore[assignment]
-

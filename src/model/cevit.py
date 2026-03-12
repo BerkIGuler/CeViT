@@ -51,12 +51,11 @@ class CeViT(nn.Module):
         ).to(device)
 
     def forward(self, ls_channel, meta_data):
-        ls_channel = ls_channel.to(self.device)
-
+        # Caller must move inputs to the model device (e.g. trainer does this once per batch).
         # meta_data: dict from TDLDataset with keys "SNR", "delay_spread", "doppler_shift"
-        snr = meta_data["SNR"].to(self.device).float().unsqueeze(1)
-        delay_spread = meta_data["delay_spread"].to(self.device).float().unsqueeze(1)
-        max_dop_shift = meta_data["doppler_shift"].to(self.device).float().unsqueeze(1)
+        snr = meta_data["SNR"].float().unsqueeze(1)
+        delay_spread = meta_data["delay_spread"].float().unsqueeze(1)
+        max_dop_shift = meta_data["doppler_shift"].float().unsqueeze(1)
 
         # Input is already dense (120×14); paper: real/imag concat → R^{Nf×2Nt}
         real_2d = self.real_imag_concat(ls_channel)  # (B, Nf, 2*Nt)
