@@ -1,7 +1,13 @@
 #!/usr/bin/env bash
+# Usage: ./train_many.sh [device]
+#   device: optional first argument, or set DEVICE env (default cuda:0).
 set -euo pipefail
 
-DEVICE="${DEVICE:-cuda:1}"
+if [[ -n "${1:-}" ]]; then
+  DEVICE="$1"
+  shift
+fi
+DEVICE="${DEVICE:-cuda:0}"
 
 CONFIGS=(
   "configs/train_tdla_2.yaml"
@@ -23,7 +29,6 @@ CONFIGS=(
   "configs/train_tdle_2711.yaml"
 )
 
-# Four experiment sets: exp2, exp3, exp4, exp5.
 # We map expN -> seed N so each set is a different seed.
 for EXP in exp1 exp2 exp3 exp4 exp5; do
   SEED="${EXP#exp}" # exp2 -> 2
@@ -32,7 +37,7 @@ for EXP in exp1 exp2 exp3 exp4 exp5; do
     RUN_NAME="${RUN_NAME#train_}"
     OUT_DIR="runs/${EXP}/${RUN_NAME}"
 
-    echo "=== ${EXP} | seed=${SEED} | ${CFG} -> ${OUT_DIR} ==="
+    echo "=== ${EXP} | device=${DEVICE} | seed=${SEED} | ${CFG} -> ${OUT_DIR} ==="
     python3 train.py "${CFG}" --device "${DEVICE}" --seed "${SEED}" --out_dir "${OUT_DIR}"
   done
 done

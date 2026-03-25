@@ -69,6 +69,12 @@ class Trainer:
 
         self.checkpoint.out_dir.mkdir(parents=True, exist_ok=True)
 
+    def init_best_from_checkpoint(self, ckpt: Dict[str, Any]) -> None:
+        """Restore best validation metrics from a prior best.pt (same global epoch numbering)."""
+        self.best_val_nmse_db = float(ckpt["val_nmse_db"])
+        self.best_epoch = int(ckpt["epoch"])
+        self._no_improve = 0
+
     @staticmethod
     def _batch_to_model_input(
         batch: Tuple[torch.Tensor, torch.Tensor, Dict[str, Any]],
@@ -99,8 +105,9 @@ class Trainer:
         den = (target * target.conj()).abs().sum(dim=dims)
         return num.sum(), den.sum()
 
-    def train(self, *, epochs: int) -> Dict[str, Any]:
+    def train(self, *, epochs: int, epoch_offset: int = 0) -> Dict[str, Any]:
         for epoch in range(1, epochs + 1):
+            global_epoch = epoch_offset + epoch
             train_loss = self._train_one_epoch()
             val_nmse_db = self._validate()
 
@@ -110,23 +117,23 @@ class Trainer:
             improved = (self.best_val_nmse_db - val_nmse_db) > self.early_stopping.min_delta
             if improved:
                 self.best_val_nmse_db = val_nmse_db
-                self.best_epoch = epoch
+                self.best_epoch = global_epoch
                 self._no_improve = 0
-                self._save_checkpoint(epoch=epoch, val_nmse_db=val_nmse_db)
+                self._save_checkpoint(epoch=global_epoch, val_nmse_db=val_nmse_db)
             else:
                 self._no_improve += 1
 
             lr = self.optimizer.param_groups[0].get("lr", None)
             lr_str = f"{lr:.3e}" if isinstance(lr, float) else str(lr)
             print(
-                f"epoch {epoch:03d} | train_mse={train_loss:.6e} | val_nmse_db={val_nmse_db:.3f} | best={self.best_val_nmse_db:.3f} @ {self.best_epoch:03d} | lr={lr_str}"
+                f"epoch {global_epoch:04d} (phase {epoch:03d}/{epochs}) | train_mse={train_loss:.6e} | val_nmse_db={val_nmse_db:.3f} | best={self.best_val_nmse_db:.3f} @ {self.best_epoch:04d} | lr={lr_str}"
             )
 
             if self.tb_writer is not None:
-                self.tb_writer.add_scalar("loss/train_mse", train_loss, epoch)
-                self.tb_writer.add_scalar("nmse/val_db", val_nmse_db, epoch)
+                self.tb_writer.add_scalar("loss/train_mse", train_loss, global_epoch)
+                self.tb_writer.add_scalar("nmse/val_db", val_nmse_db, global_epoch)
                 if isinstance(lr, float):
-                    self.tb_writer.add_scalar("optim/lr", lr, epoch)
+                    self.tb_writer.add_scalar("optim/lr", lr, global_epoch)
 
             if self._no_improve >= self.early_stopping.patience:
                 print(

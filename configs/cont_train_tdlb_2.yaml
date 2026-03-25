@@ -1,0 +1,47 @@
+# Continued training: TDL-B, pilot symbol [2] only.
+# Phase 2: lr=1e-4, 1000 more epochs. Load runs/expY/tdlb_2/best.pt via --resume.
+# Scheduler step_size 1000: keep lr 1e-4 for the full second phase.
+
+seed: 1337
+
+device: cuda:0
+
+paths:
+  data_path: /opt/shared/datasets/NeoRadiumTDLdataset/train/TDLB/
+  out_dir: runs/tdlb_2/
+
+split:
+  val_split: 0.1
+
+train:
+  epochs: 1000
+  batch_size: 512
+  num_workers: 4
+  epoch_offset: 1000
+
+optim:
+  lr: 0.0001
+  weight_decay: 0.0
+  scheduler:
+    step_size: 1000
+    gamma: 0.1
+
+early_stopping:
+  patience: 1000
+  min_delta: 1e-5
+
+dataset:
+  num_subcarriers: 120
+  num_symbols: 14
+  pilot_symbols: [2]
+  pilot_every_n: 2
+  snrs: [0, 5, 10, 15, 20, 25, 30]
+
+model:
+  token_emb_dim: 168
+  patch_dim: 40
+  model_dim: 128
+  num_heads: 4
+  dropout: 0.0
+  patch_size: [10, 4]
+  activation: "gelu"

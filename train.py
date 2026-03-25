@@ -1,7 +1,7 @@
 import argparse
 import random
 from pathlib import Path
-from typing import Any, Dict, Union
+from typing import Any, Dict, Optional, Union
 
 import numpy as np
 import torch
@@ -26,6 +26,8 @@ DEFAULTS: Dict[str, Any] = {
         "epochs": 1000,
         "batch_size": 512,
         "num_workers": 4,
+        # Global step for TensorBoard / checkpoint epoch after a prior training phase (e.g. 1000).
+        "epoch_offset": 0,
     },
     "dataset": {
         "num_subcarriers": 120,
@@ -82,6 +84,18 @@ def _build_argparser() -> argparse.ArgumentParser:
         type=str,
         default=None,
         help="Override `paths.out_dir` from config (e.g. runs/exp2/tdla_2).",
+    )
+    p.add_argument(
+        "--resume",
+        type=str,
+        default=None,
+        help="Path to best.pt (or checkpoint) to load model weights from. Optimizer/scheduler are re-created from config.",
+    )
+    p.add_argument(
+        "--epoch_offset",
+        type=int,
+        default=None,
+        help="Override train.epoch_offset (TensorBoard x-axis continues at offset+1, …).",
     )
     return p
 
@@ -153,6 +167,9 @@ def main() -> None:
         resolved_cfg["paths"].setdefault("data_path", str(data_path))
         resolved_cfg["paths"].setdefault("out_dir", str(out_dir_path))
         resolved_cfg["paths"].setdefault("config_path", str(Path(args.config).resolve()))
+    resume_path = args.resume or _cfg_get(cfg, "paths.resume_checkpoint")
+    if resume_path and isinstance(resolved_cfg.get("paths"), dict):
+        resolved_cfg["paths"]["resume_checkpoint"] = str(Path(resume_path).resolve())
     config_dump_path = out_dir_path / "config.yaml"
     with open(config_dump_path, "w", encoding="utf-8") as f:
         yaml.safe_dump(resolved_cfg, f, sort_keys=False)
@@ -225,6 +242,12 @@ def main() -> None:
         activation=activation,
     ).to(device)
 
+    resume_ckpt: Optional[Dict[str, Any]] = None
+    if resume_path:
+        resume_ckpt = torch.load(str(resume_path), map_location=device)
+        model.load_state_dict(resume_ckpt["model_state_dict"])
+        print(f"Loaded model weights from {resume_path}")
+
     epochs = int(_cfg_get(cfg, "train.epochs", DEFAULTS["train"]["epochs"]))
     lr = float(_cfg_get(cfg, "optim.lr", DEFAULTS["optim"]["lr"]))
     optimizer = torch.optim.Adam(model.parameters(), lr=lr)
@@ -251,7 +274,16 @@ def main() -> None:
         tb_writer=tb_writer,
     )
 
-    summary = trainer.train(epochs=epochs)
+    if resume_ckpt is not None:
+        trainer.init_best_from_checkpoint(resume_ckpt)
+
+    epoch_offset = (
+        int(args.epoch_offset)
+        if args.epoch_offset is not None
+        else int(_cfg_get(cfg, "train.epoch_offset", DEFAULTS["train"]["epoch_offset"]))
+    )
+
+    summary = trainer.train(epochs=epochs, epoch_offset=epoch_offset)
     print("done:", summary)
     tb_writer.close()
 

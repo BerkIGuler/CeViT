@@ -1,10 +1,23 @@
 #!/usr/bin/env bash
+# Usage: ./evaluate_many.sh [device]
+#   device: optional first argument, or set DEVICE env (default cuda:0).
 set -euo pipefail
 
+if [[ -n "${1:-}" ]]; then
+  DEVICE="$1"
+  shift
+fi
 DEVICE="${DEVICE:-cuda:0}"
-EXP="${1:-exp1}"
 
 DATA_ROOT="/opt/shared/datasets/NeoRadiumTDLdataset/test"
+
+EXPERIMENTS=(
+  "exp1"
+  "exp2"
+  "exp3"
+  "exp4"
+  "exp5"
+)
 
 RUNS=(
   "tdla_2"
@@ -26,28 +39,30 @@ RUNS=(
   "tdle_2711"
 )
 
-for RUN in "${RUNS[@]}"; do
-  # tdla_2 -> TDLA, tdle_2711 -> TDLE
-  TDL_VARIANT="${RUN%%_*}"           # tdla
-  TDL_DIR="${TDL_VARIANT^^}"        # TDLA  (bash uppercase)
+for EXP in "${EXPERIMENTS[@]}"; do
+  for RUN in "${RUNS[@]}"; do
+    # tdla_2 -> TDLA, tdle_2711 -> TDLE
+    TDL_VARIANT="${RUN%%_*}"           # tdla
+    TDL_DIR="${TDL_VARIANT^^}"         # TDLA  (bash uppercase)
 
-  # _2 -> "2", _23 -> "2 3", _2711 -> "2 7 11"
-  PILOT_SUFFIX="${RUN#*_}"           # 2 / 23 / 2711
-  case "${PILOT_SUFFIX}" in
-    2)    PILOT_SYMBOLS="2"       ;;
-    23)   PILOT_SYMBOLS="2 3"     ;;
-    2711) PILOT_SYMBOLS="2 7 11"  ;;
-    *)    echo "Unknown pilot suffix '${PILOT_SUFFIX}' for run '${RUN}'" >&2; exit 1 ;;
-  esac
+    # _2 -> "2", _23 -> "2 3", _2711 -> "2 7 11"
+    PILOT_SUFFIX="${RUN#*_}"           # 2 / 23 / 2711
+    case "${PILOT_SUFFIX}" in
+      2)    PILOT_SYMBOLS="2"       ;;
+      23)   PILOT_SYMBOLS="2 3"     ;;
+      2711) PILOT_SYMBOLS="2 7 11"  ;;
+      *)    echo "Unknown pilot suffix '${PILOT_SUFFIX}' for run '${RUN}'" >&2; exit 1 ;;
+    esac
 
-  CHECKPOINT="runs/${EXP}/${RUN}/best.pt"
-  DATA_PATH="${DATA_ROOT}/${TDL_DIR}/"
+    CHECKPOINT="runs/${EXP}/${RUN}/best.pt"
+    DATA_PATH="${DATA_ROOT}/${TDL_DIR}/"
 
-  echo "=== ${EXP} | ${RUN} | pilots=${PILOT_SYMBOLS} ==="
-  # shellcheck disable=SC2086
-  python3 evaluate.py \
-    --data_path "${DATA_PATH}" \
-    --checkpoint "${CHECKPOINT}" \
-    --pilot_symbols ${PILOT_SYMBOLS} \
-    --device "${DEVICE}"
+    echo "=== ${EXP} | device=${DEVICE} | ${RUN} | pilots=${PILOT_SYMBOLS} ==="
+    # shellcheck disable=SC2086
+    python3 evaluate.py \
+      --data_path "${DATA_PATH}" \
+      --checkpoint "${CHECKPOINT}" \
+      --pilot_symbols ${PILOT_SYMBOLS} \
+      --device "${DEVICE}"
+  done
 done
