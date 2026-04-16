@@ -1,0 +1,47 @@
+seed: 1337
+device: cuda:0
+paths:
+  data_path: /opt/shared/datasets/NeoRadiumTDLdataset/train/TDLD/
+  out_dir: runs/tdld_2/
+  config_path: /home/berkay/research/CeViT/configs/cont_train_tdld_2.yaml
+  resume_checkpoint: /home/berkay/research/CeViT/runs/exp5/tdld_2/best.pt
+split:
+  val_split: 0.1
+train:
+  epochs: 1000
+  batch_size: 512
+  num_workers: 4
+  epoch_offset: 1000
+optim:
+  lr: 0.0001
+  weight_decay: 0.0
+  scheduler:
+    step_size: 1000
+    gamma: 0.1
+early_stopping:
+  patience: 1000
+  min_delta: 1e-5
+dataset:
+  num_subcarriers: 120
+  num_symbols: 14
+  pilot_symbols:
+  - 2
+  pilot_every_n: 2
+  snrs:
+  - 0
+  - 5
+  - 10
+  - 15
+  - 20
+  - 25
+  - 30
+model:
+  token_emb_dim: 168
+  patch_dim: 40
+  model_dim: 128
+  num_heads: 4
+  dropout: 0.0
+  patch_size:
+  - 10
+  - 4
+  activation: gelu

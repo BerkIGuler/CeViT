@@ -1,5 +1,4 @@
 .git/
-runs/
 __pycache__/
 CHAST/
 *.pdf

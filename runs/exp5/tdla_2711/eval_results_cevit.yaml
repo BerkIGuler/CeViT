@@ -1,0 +1,133 @@
+0:
+  high_delay_high_mobility:
+    nmse_mean_db: -10.128951072692871
+  high_delay_low_mobility:
+    nmse_mean_db: -12.136589050292969
+  high_delay_moderate_mobility:
+    nmse_mean_db: -10.954198837280273
+  low_delay_high_mobility:
+    nmse_mean_db: -13.537595748901367
+  low_delay_low_mobility:
+    nmse_mean_db: -15.872716903686523
+  low_delay_moderate_mobility:
+    nmse_mean_db: -14.55431842803955
+  moderate_delay_high_mobility:
+    nmse_mean_db: -11.25485897064209
+  moderate_delay_low_mobility:
+    nmse_mean_db: -13.374500274658203
+  moderate_delay_moderate_mobility:
+    nmse_mean_db: -12.117566108703613
+5:
+  high_delay_high_mobility:
+    nmse_mean_db: -13.404848098754883
+  high_delay_low_mobility:
+    nmse_mean_db: -15.702133178710938
+  high_delay_moderate_mobility:
+    nmse_mean_db: -14.329730987548828
+  low_delay_high_mobility:
+    nmse_mean_db: -17.150508880615234
+  low_delay_low_mobility:
+    nmse_mean_db: -19.691814422607422
+  low_delay_moderate_mobility:
+    nmse_mean_db: -18.224018096923828
+  moderate_delay_high_mobility:
+    nmse_mean_db: -14.64211654663086
+  moderate_delay_low_mobility:
+    nmse_mean_db: -17.040302276611328
+  moderate_delay_moderate_mobility:
+    nmse_mean_db: -15.642767906188965
+10:
+  high_delay_high_mobility:
+    nmse_mean_db: -16.818058013916016
+  high_delay_low_mobility:
+    nmse_mean_db: -19.35826301574707
+  high_delay_moderate_mobility:
+    nmse_mean_db: -17.87060546875
+  low_delay_high_mobility:
+    nmse_mean_db: -20.705360412597656
+  low_delay_low_mobility:
+    nmse_mean_db: -23.481943130493164
+  low_delay_moderate_mobility:
+    nmse_mean_db: -21.871295928955078
+  moderate_delay_high_mobility:
+    nmse_mean_db: -18.109146118164062
+  moderate_delay_low_mobility:
+    nmse_mean_db: -20.730663299560547
+  moderate_delay_moderate_mobility:
+    nmse_mean_db: -19.220890045166016
+15:
+  high_delay_high_mobility:
+    nmse_mean_db: -20.196304321289062
+  high_delay_low_mobility:
+    nmse_mean_db: -22.935943603515625
+  high_delay_moderate_mobility:
+    nmse_mean_db: -21.40885353088379
+  low_delay_high_mobility:
+    nmse_mean_db: -23.92473030090332
+  low_delay_low_mobility:
+    nmse_mean_db: -27.074169158935547
+  low_delay_moderate_mobility:
+    nmse_mean_db: -25.44034767150879
+  moderate_delay_high_mobility:
+    nmse_mean_db: -21.470924377441406
+  moderate_delay_low_mobility:
+    nmse_mean_db: -24.38114356994629
+  moderate_delay_moderate_mobility:
+    nmse_mean_db: -22.82012176513672
+20:
+  high_delay_high_mobility:
+    nmse_mean_db: -23.287818908691406
+  high_delay_low_mobility:
+    nmse_mean_db: -26.27661895751953
+  high_delay_moderate_mobility:
+    nmse_mean_db: -24.829456329345703
+  low_delay_high_mobility:
+    nmse_mean_db: -26.615676879882812
+  low_delay_low_mobility:
+    nmse_mean_db: -30.44355583190918
+  low_delay_moderate_mobility:
+    nmse_mean_db: -28.83150291442871
+  moderate_delay_high_mobility:
+    nmse_mean_db: -24.549793243408203
+  moderate_delay_low_mobility:
+    nmse_mean_db: -27.89556121826172
+  moderate_delay_moderate_mobility:
+    nmse_mean_db: -26.319347381591797
+25:
+  high_delay_high_mobility:
+    nmse_mean_db: -25.65185546875
+  high_delay_low_mobility:
+    nmse_mean_db: -29.283985137939453
+  high_delay_moderate_mobility:
+    nmse_mean_db: -27.91013526916504
+  low_delay_high_mobility:
+    nmse_mean_db: -28.59978485107422
+  low_delay_low_mobility:
+    nmse_mean_db: -33.57120895385742
+  low_delay_moderate_mobility:
+    nmse_mean_db: -31.899147033691406
+  moderate_delay_high_mobility:
+    nmse_mean_db: -27.008493423461914
+  moderate_delay_low_mobility:
+    nmse_mean_db: -31.199710845947266
+  moderate_delay_moderate_mobility:
+    nmse_mean_db: -29.60587501525879
+30:
+  high_delay_high_mobility:
+    nmse_mean_db: -26.951969146728516
+  high_delay_low_mobility:
+    nmse_mean_db: -31.51727294921875
+  high_delay_moderate_mobility:
+    nmse_mean_db: -30.147077560424805
+  low_delay_high_mobility:
+    nmse_mean_db: -29.71825408935547
+  low_delay_low_mobility:
+    nmse_mean_db: -36.042030334472656
+  low_delay_moderate_mobility:
+    nmse_mean_db: -34.203704833984375
+  moderate_delay_high_mobility:
+    nmse_mean_db: -28.467931747436523
+  moderate_delay_low_mobility:
+    nmse_mean_db: -33.94994354248047
+  moderate_delay_moderate_mobility:
+    nmse_mean_db: -32.241661071777344
